@@ -1,7 +1,7 @@
 [package]
 authors = ["Christian Visintin <christian.visintin1997@gmail.com>"]
 categories = ["network-programming"]
-description = "a ssh configuration parser for ssh2 library"
+description = "an ssh configuration parser for ssh2-rs"
 documentation = "https://docs.rs/ssh2-config"
 edition = "2021"
 homepage = "https://veeso.github.io/ssh2-config/"
