@@ -214,13 +214,16 @@ impl SshConfigParser {
 
     /// Tokenize line if possible. Returns field name and args
     fn tokenize(line: &str) -> SshParserResult<Option<(Field, Vec<String>)>> {
-        let mut tokens = line.split_whitespace();
+        let mut tokens = line.trim().split_whitespace();
         let field = match tokens.next().map(|x| Field::from_str(x)) {
             Some(Ok(field)) => field,
             Some(Err(_)) => return Ok(None),
             None => return Err(SshParserError::MissingArgument),
         };
-        let args = tokens.map(|x| x.trim().to_string()).collect();
+        let args = tokens
+            .map(|x| x.trim().to_string())
+            .filter(|x| !x.is_empty())
+            .collect();
         Ok(Some((field, args)))
     }
 
@@ -303,8 +306,239 @@ impl SshConfigParser {
     fn parse_unsigned(args: Vec<String>) -> SshParserResult<usize> {
         match args.get(0).map(|x| usize::from_str(x)) {
             Some(Ok(val)) => Ok(val),
-            Some(Err(_)) => Err(SshParserError::ExpectedPort),
+            Some(Err(_)) => Err(SshParserError::ExpectedUnsigned),
             None => Err(SshParserError::MissingArgument),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn should_resolve_algorithms_list_when_preceeded_by_plus() {
+        let mut list = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ];
+        let algos = vec![
+            "+1".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "3".to_string(),
+            "d".to_string(),
+        ];
+        SshConfigParser::resolve_algorithms(&mut list, algos);
+        assert_eq!(
+            list,
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+                "e".to_string(),
+                "1".to_string(),
+                "3".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn should_tokenize_line() {
+        assert_eq!(
+            SshConfigParser::tokenize("HostName 192.168.*.* 172.26.*.*")
+                .ok()
+                .unwrap()
+                .unwrap(),
+            (
+                Field::HostName,
+                vec![String::from("192.168.*.*"), String::from("172.26.*.*")]
+            )
+        );
+        // Tokenize line with spaces
+        assert_eq!(
+            SshConfigParser::tokenize(
+                "      HostName        192.168.*.*        172.26.*.*        "
+            )
+            .ok()
+            .unwrap()
+            .unwrap(),
+            (
+                Field::HostName,
+                vec![String::from("192.168.*.*"), String::from("172.26.*.*")]
+            )
+        );
+    }
+
+    #[test]
+    fn should_not_tokenize_line() {
+        assert!(SshConfigParser::tokenize("Omar     yes")
+            .ok()
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn should_fail_parsing_field() {
+        assert!(SshConfigParser::tokenize("                  ").is_err());
+    }
+
+    #[test]
+    fn should_parse_boolean() {
+        assert_eq!(
+            SshConfigParser::parse_boolean(vec![String::from("yes")])
+                .ok()
+                .unwrap(),
+            true
+        );
+        assert_eq!(
+            SshConfigParser::parse_boolean(vec![String::from("no")])
+                .ok()
+                .unwrap(),
+            false
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_boolean() {
+        assert!(SshConfigParser::parse_boolean(vec!["boh".to_string()]).is_err());
+        assert!(SshConfigParser::parse_boolean(vec![]).is_err());
+    }
+
+    #[test]
+    fn should_parse_comma_separated_list() {
+        assert_eq!(
+            SshConfigParser::parse_comma_separated_list(vec![String::from("a,b,c,d")])
+                .ok()
+                .unwrap(),
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+            ]
+        );
+        assert_eq!(
+            SshConfigParser::parse_comma_separated_list(vec![String::from("a")])
+                .ok()
+                .unwrap(),
+            vec!["a".to_string()]
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_comma_separated_list() {
+        assert!(SshConfigParser::parse_comma_separated_list(vec![]).is_err());
+    }
+
+    #[test]
+    fn should_parse_duration() {
+        assert_eq!(
+            SshConfigParser::parse_duration(vec![String::from("60")])
+                .ok()
+                .unwrap(),
+            Duration::from_secs(60)
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_duration() {
+        assert!(SshConfigParser::parse_duration(vec![String::from("AAA")]).is_err());
+        assert!(SshConfigParser::parse_duration(vec![]).is_err());
+    }
+
+    #[test]
+    fn should_parse_host() {
+        assert_eq!(
+            SshConfigParser::parse_host(vec![
+                String::from("192.168.*.*"),
+                String::from("!192.168.1.1"),
+                String::from("172.26.104.*"),
+                String::from("!172.26.104.10"),
+            ])
+            .ok()
+            .unwrap(),
+            vec![
+                HostClause::new(String::from("192.168.*.*"), false),
+                HostClause::new(String::from("192.168.1.1"), true),
+                HostClause::new(String::from("172.26.104.*"), false),
+                HostClause::new(String::from("172.26.104.10"), true),
+            ]
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_host() {
+        assert!(SshConfigParser::parse_host(vec![]).is_err())
+    }
+
+    #[test]
+    fn should_parse_path() {
+        assert_eq!(
+            SshConfigParser::parse_path(vec![String::from("/tmp/a.txt")])
+                .ok()
+                .unwrap(),
+            PathBuf::from("/tmp/a.txt")
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_path() {
+        assert!(SshConfigParser::parse_path(vec![]).is_err());
+    }
+
+    #[test]
+    fn should_parse_port() {
+        assert_eq!(
+            SshConfigParser::parse_port(vec![String::from("22")])
+                .ok()
+                .unwrap(),
+            22
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_port() {
+        assert!(SshConfigParser::parse_port(vec![String::from("1234567")]).is_err());
+        assert!(SshConfigParser::parse_port(vec![]).is_err());
+    }
+
+    #[test]
+    fn should_parse_string() {
+        assert_eq!(
+            SshConfigParser::parse_string(vec![String::from("foobar")])
+                .ok()
+                .unwrap(),
+            String::from("foobar")
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_string() {
+        assert!(SshConfigParser::parse_string(vec![]).is_err());
+    }
+
+    #[test]
+    fn should_parse_unsigned() {
+        assert_eq!(
+            SshConfigParser::parse_unsigned(vec![String::from("43")])
+                .ok()
+                .unwrap(),
+            43
+        );
+    }
+
+    #[test]
+    fn should_fail_parsing_unsigned() {
+        assert!(SshConfigParser::parse_unsigned(vec![String::from("abc")]).is_err());
+        assert!(SshConfigParser::parse_unsigned(vec![]).is_err());
     }
 }
