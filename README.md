@@ -76,7 +76,7 @@ TODO:
 
 ## Support the developer ☕
 
-If you like tui-realm and you're grateful for the work I've done, please consider a little donation 🥳
+If you like ssh2-config and you're grateful for the work I've done, please consider a little donation 🥳
 
 You can make a donation with one of these platforms:
 
