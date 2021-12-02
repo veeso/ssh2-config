@@ -1,0 +1,27 @@
+[package]
+authors = ["Christian Visintin <christian.visintin1997@gmail.com>"]
+categories = ["network-programming"]
+description = "a ssh2 config parser with integration for ssh2 library"
+documentation = "https://docs.rs/ssh2-config"
+edition = "2021"
+homepage = "https://veeso.github.io/ssh2-config/"
+include = ["src/**/*", "LICENSE", "README.md", "CHANGELOG.md"]
+keywords = ["ssh2", "ssh", "ssh-config", "ssh-config-parser"]
+license = "MIT"
+name = "ssh2-config"
+readme = "README.md"
+repository = "https://github.com/veeso/ssh2-config"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# session
+ssh2 = { version = "^0.9.0", optional = true }
+
+[dev-dependencies]
+pretty_assertions = "^1.0.0"
+
+[features]
+default = [ "session" ]
+session = [ "ssh2" ]
