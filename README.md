@@ -62,17 +62,9 @@
 
 TODO:
 
----
+### Missing features 😞
 
-## Features 🎁
-
-- 📁  Different communication protocols
-  - **SFTP**
-  - **SCP**
-  - **FTP** and **FTPS**
-  - **Aws S3**
-
-TODO:
+- [Tokens](http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#TOKENS)
 
 ---
 
