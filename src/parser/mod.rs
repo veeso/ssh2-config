@@ -77,7 +77,7 @@ impl SshConfigParser {
                 Some(Ok(line)) => line.trim().to_string(),
             };
             // skip comments
-            if line.starts_with('#') {
+            if line.starts_with('#') || line.is_empty() {
                 continue;
             }
             // tokenize
@@ -122,10 +122,7 @@ impl SshConfigParser {
                 if params.ca_signature_algorithms.is_none() {
                     params.ca_signature_algorithms = Some(Vec::new());
                 }
-                Self::resolve_algorithms(
-                    &mut params.ca_signature_algorithms.as_mut().unwrap(),
-                    algos,
-                );
+                Self::resolve_algorithms(params.ca_signature_algorithms.as_mut().unwrap(), algos);
             }
             Field::CertificateFile => {
                 params.certificate_file = Some(Self::parse_path(args)?);
@@ -135,7 +132,7 @@ impl SshConfigParser {
                 if params.ciphers.is_none() {
                     params.ciphers = Some(Vec::new());
                 }
-                Self::resolve_algorithms(&mut params.ciphers.as_mut().unwrap(), algos);
+                Self::resolve_algorithms(params.ciphers.as_mut().unwrap(), algos);
             }
             Field::Compression => {
                 params.compression = Some(Self::parse_boolean(args)?);
@@ -143,8 +140,8 @@ impl SshConfigParser {
             Field::ConnectTimeout => {
                 params.connect_timeout = Some(Self::parse_duration(args)?);
             }
-            Field::ConnectionAttemps => {
-                params.connection_attemps = Some(Self::parse_unsigned(args)?);
+            Field::ConnectionAttempts => {
+                params.connection_attempts = Some(Self::parse_unsigned(args)?);
             }
             Field::Host => { /* already handled before */ }
             Field::HostName => {
@@ -155,7 +152,7 @@ impl SshConfigParser {
                 if params.mac.is_none() {
                     params.mac = Some(Vec::new());
                 }
-                Self::resolve_algorithms(&mut params.mac.as_mut().unwrap(), algos);
+                Self::resolve_algorithms(params.mac.as_mut().unwrap(), algos);
             }
             Field::PubkeyAcceptedAlgorithms => {
                 let algos = Self::parse_comma_separated_list(args)?;
@@ -163,7 +160,7 @@ impl SshConfigParser {
                     params.pubkey_accepted_algorithms = Some(Vec::new());
                 }
                 Self::resolve_algorithms(
-                    &mut params.pubkey_accepted_algorithms.as_mut().unwrap(),
+                    params.pubkey_accepted_algorithms.as_mut().unwrap(),
                     algos,
                 );
             }
@@ -175,6 +172,9 @@ impl SshConfigParser {
             }
             Field::TcpKeepAlive => {
                 params.tcp_keep_alive = Some(Self::parse_boolean(args)?);
+            }
+            Field::User => {
+                params.user = Some(Self::parse_string(args)?);
             }
         }
         Ok(())
@@ -200,13 +200,7 @@ impl SshConfigParser {
             let new_first = first.replacen('-', "", 1);
             algos[0] = new_first;
             // Remove algos from current_list
-            let mut i = 0;
-            while i < current_list.len() {
-                if algos.contains(&current_list[i]) {
-                    current_list.remove(i);
-                }
-                i += 1;
-            }
+            current_list.retain(|x| !algos.contains(x));
         } else {
             *current_list = algos;
         }
@@ -215,7 +209,7 @@ impl SshConfigParser {
     /// Tokenize line if possible. Returns field name and args
     fn tokenize(line: &str) -> SshParserResult<Option<(Field, Vec<String>)>> {
         let mut tokens = line.trim().split_whitespace();
-        let field = match tokens.next().map(|x| Field::from_str(x)) {
+        let field = match tokens.next().map(Field::from_str) {
             Some(Ok(field)) => field,
             Some(Err(_)) => return Ok(None),
             None => return Err(SshParserError::MissingArgument),
@@ -318,7 +312,296 @@ mod test {
     use super::*;
 
     use pretty_assertions::assert_eq;
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::io::Write;
+    use std::path::Path;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn should_parse_configuration() {
+        let temp = create_ssh_config();
+        let file = File::open(temp.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+        let config = SshConfig::default().parse(&mut reader).unwrap();
+        // Query
+        let params = config.default_params();
+        assert_eq!(params.compression.unwrap(), true);
+        assert_eq!(params.connection_attempts.unwrap(), 10);
+        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
+        assert_eq!(params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(
+            params.ca_signature_algorithms.as_deref().unwrap(),
+            &["random"]
+        );
+        assert_eq!(
+            params.ciphers.as_deref().unwrap(),
+            &["a-manella", "blowfish"]
+        );
+        assert_eq!(params.mac.as_deref().unwrap(), &["concorde"]);
+        assert_eq!(
+            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            &["desu", "omar-crypt", "fast-omar-crypt"]
+        );
+        assert!(params.bind_address.is_none());
+        // Query 172.26.104.4
+        let params = config.query("172.26.104.4");
+        assert_eq!(params.compression.unwrap(), true);
+        assert_eq!(params.connection_attempts.unwrap(), 10);
+        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
+        assert_eq!(params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(
+            params.ca_signature_algorithms.as_deref().unwrap(),
+            &["random"]
+        );
+        assert_eq!(
+            params.ciphers.as_deref().unwrap(),
+            &[
+                "a-manella",
+                "blowfish",
+                "coi-piedi",
+                "cazdecan",
+                "triestin-stretto"
+            ]
+        );
+        assert_eq!(params.mac.as_deref().unwrap(), &["spyro", "deoxys"]);
+        assert_eq!(
+            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            &["desu", "fast-omar-crypt"]
+        );
+        assert_eq!(params.bind_address.as_deref().unwrap(), "10.8.0.10");
+        assert_eq!(params.bind_interface.as_deref().unwrap(), "tun0");
+        assert_eq!(params.user.as_deref().unwrap(), "omar");
+        // Query tostapane
+        let params = config.query("tostapane");
+        assert_eq!(params.compression.unwrap(), false);
+        assert_eq!(params.connection_attempts.unwrap(), 10);
+        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
+        assert_eq!(params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(
+            params.ca_signature_algorithms.as_deref().unwrap(),
+            &["random"]
+        );
+        assert_eq!(
+            params.ciphers.as_deref().unwrap(),
+            &["a-manella", "blowfish",]
+        );
+        assert_eq!(params.mac.as_deref().unwrap(), &["concorde"]);
+        assert_eq!(
+            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            &["desu", "omar-crypt", "fast-omar-crypt"]
+        );
+        assert_eq!(params.remote_forward.unwrap(), 88);
+        assert_eq!(params.user.as_deref().unwrap(), "ciro-esposito");
+        // query 192.168.1.30
+        let params = config.query("192.168.1.30");
+        assert_eq!(params.compression.unwrap(), true);
+        assert_eq!(params.connection_attempts.unwrap(), 10);
+        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
+        assert_eq!(params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(
+            params.ca_signature_algorithms.as_deref().unwrap(),
+            &["random"]
+        );
+        assert_eq!(
+            params.ciphers.as_deref().unwrap(),
+            &["a-manella", "blowfish"]
+        );
+        assert_eq!(params.mac.as_deref().unwrap(), &["concorde"]);
+        assert_eq!(
+            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            &["desu", "omar-crypt", "fast-omar-crypt"]
+        );
+        assert_eq!(params.user.as_deref().unwrap(), "nutellaro");
+        assert_eq!(params.remote_forward.unwrap(), 123);
+    }
+
+    #[test]
+    fn should_update_host_bind_address() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::BindAddress,
+            vec![String::from("127.0.0.1")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.bind_address.as_deref().unwrap(), "127.0.0.1");
+    }
+
+    #[test]
+    fn should_update_host_bind_interface() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::BindInterface,
+            vec![String::from("aaa")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.bind_interface.as_deref().unwrap(), "aaa");
+    }
+
+    #[test]
+    fn should_update_host_ca_signature_algos() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::CaSignatureAlgorithms,
+            vec![String::from("a,b,c")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(
+            params.ca_signature_algorithms.as_deref().unwrap(),
+            &["a", "b", "c"]
+        );
+    }
+
+    #[test]
+    fn should_update_host_certificate_file() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::CertificateFile,
+            vec![String::from("/tmp/a.crt")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(
+            params.certificate_file.as_deref().unwrap(),
+            Path::new("/tmp/a.crt")
+        );
+    }
+
+    #[test]
+    fn should_update_host_ciphers() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::Ciphers,
+            vec![String::from("a,b,c")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.ciphers.as_deref().unwrap(), &["a", "b", "c"]);
+    }
+
+    #[test]
+    fn should_update_host_compression() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::Compression,
+            vec![String::from("yes")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.compression.unwrap(), true);
+    }
+
+    #[test]
+    fn should_update_host_connection_attempts() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::ConnectionAttempts,
+            vec![String::from("4")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.connection_attempts.unwrap(), 4);
+    }
+
+    #[test]
+    fn should_update_host_connection_timeout() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::ConnectTimeout,
+            vec![String::from("10")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(10));
+    }
+
+    #[test]
+    fn should_update_host_host_name() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::HostName,
+            vec![String::from("192.168.1.1")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.host_name.as_deref().unwrap(), "192.168.1.1");
+    }
+
+    #[test]
+    fn should_update_host_mac() {
+        let mut params = HostParams::default();
+        assert!(
+            SshConfigParser::update_host(Field::Mac, vec![String::from("a,b,c")], &mut params)
+                .is_ok()
+        );
+        assert_eq!(params.mac.as_deref().unwrap(), &["a", "b", "c"]);
+    }
+
+    #[test]
+    fn should_update_host_pubkey_accepted_algos() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::PubkeyAcceptedAlgorithms,
+            vec![String::from("a,b,c")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(
+            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            &["a", "b", "c"]
+        );
+    }
+
+    #[test]
+    fn should_update_host_pubkey_authentication() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::PubkeyAuthentication,
+            vec![String::from("yes")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.pubkey_authentication.unwrap(), true);
+    }
+
+    #[test]
+    fn should_update_host_remote_forward() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::RemoteForward,
+            vec![String::from("3005")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.remote_forward.unwrap(), 3005);
+    }
+
+    #[test]
+    fn should_update_host_tcp_keep_alive() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::TcpKeepAlive,
+            vec![String::from("no")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.tcp_keep_alive.unwrap(), false);
+    }
+
+    #[test]
+    fn should_update_host_user() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::User,
+            vec![String::from("pippo")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.user.as_deref().unwrap(), "pippo");
+    }
 
     #[test]
     fn should_resolve_algorithms_list_when_preceeded_by_plus() {
@@ -347,6 +630,52 @@ mod test {
                 "e".to_string(),
                 "1".to_string(),
                 "3".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn should_resolve_algorithms_list_when_preceeded_by_minus() {
+        let mut list = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ];
+        let algos = vec!["-a".to_string(), "b".to_string(), "3".to_string()];
+        SshConfigParser::resolve_algorithms(&mut list, algos);
+        assert_eq!(
+            list,
+            vec!["c".to_string(), "d".to_string(), "e".to_string(),]
+        );
+    }
+
+    #[test]
+    fn should_resolve_algorithm_list_when_replacing() {
+        let mut list = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ];
+        let algos = vec![
+            "1".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "3".to_string(),
+            "d".to_string(),
+        ];
+        SshConfigParser::resolve_algorithms(&mut list, algos);
+        assert_eq!(
+            list,
+            vec![
+                "1".to_string(),
+                "a".to_string(),
+                "b".to_string(),
+                "3".to_string(),
+                "d".to_string(),
             ]
         );
     }
@@ -540,5 +869,53 @@ mod test {
     fn should_fail_parsing_unsigned() {
         assert!(SshConfigParser::parse_unsigned(vec![String::from("abc")]).is_err());
         assert!(SshConfigParser::parse_unsigned(vec![]).is_err());
+    }
+
+    fn create_ssh_config() -> NamedTempFile {
+        let mut tmpfile: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let config = r##"
+# ssh config
+# written by veeso
+
+
+        # I put a comment here just to annoy
+
+Compression yes
+ConnectionAttempts          10
+ConnectTimeout 60
+TcpKeepAlive    yes
+
+CaSignatureAlgorithms   random
+Ciphers     a-manella,blowfish
+Mac     concorde
+PubkeyAcceptedAlgorithms    desu,omar-crypt,fast-omar-crypt
+
+
+# Let's start defining some hosts
+
+Host 192.168.*.*    172.26.*.*      !192.168.1.30
+    User    omar
+    # Forward agent is actually not supported; I just want to see that it wont' fail parsing
+    ForwardAgent    yes
+    BindAddress     10.8.0.10
+    BindInterface   tun0
+    Ciphers     +coi-piedi,cazdecan,triestin-stretto
+    Mac     spyro,deoxys
+    PubkeyAcceptedAlgorithms    -omar-crypt
+
+Host tostapane
+    User    ciro-esposito
+    HostName    192.168.24.32
+    RemoteForward   88
+    Compression no
+
+Host    192.168.1.30
+    User    nutellaro
+    RemoteForward   123
+
+"##;
+        tmpfile.write_all(config.as_bytes()).unwrap();
+        tmpfile
     }
 }

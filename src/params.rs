@@ -45,7 +45,7 @@ pub struct HostParams {
     /// Specifies whether to use compression
     pub compression: Option<bool>,
     /// Specifies the number of attempts to make before exiting
-    pub connection_attemps: Option<usize>,
+    pub connection_attempts: Option<usize>,
     /// Specifies the timeout used when connecting to the SSH server
     pub connect_timeout: Option<Duration>,
     /// Specifies the real host name to log into
@@ -60,6 +60,8 @@ pub struct HostParams {
     pub remote_forward: Option<u16>,
     /// Specifies whether to send TCP keepalives to the other side
     pub tcp_keep_alive: Option<bool>,
+    /// Specifies the user to log in as.
+    pub user: Option<String>,
 }
 
 impl HostParams {
@@ -83,8 +85,8 @@ impl HostParams {
         if let Some(compression) = b.compression {
             self.compression = Some(compression);
         }
-        if let Some(connection_attemps) = b.connection_attemps {
-            self.connection_attemps = Some(connection_attemps);
+        if let Some(connection_attempts) = b.connection_attempts {
+            self.connection_attempts = Some(connection_attempts);
         }
         if let Some(connect_timeout) = b.connect_timeout {
             self.connect_timeout = Some(connect_timeout);
@@ -107,6 +109,9 @@ impl HostParams {
         if let Some(tcp_keep_alive) = b.tcp_keep_alive {
             self.tcp_keep_alive = Some(tcp_keep_alive);
         }
+        if let Some(user) = b.user.clone() {
+            self.user = Some(user);
+        }
     }
 }
 
@@ -126,7 +131,7 @@ mod test {
         assert!(params.certificate_file.is_none());
         assert!(params.ciphers.is_none());
         assert!(params.compression.is_none());
-        assert!(params.connection_attemps.is_none());
+        assert!(params.connection_attempts.is_none());
         assert!(params.connect_timeout.is_none());
         assert!(params.host_name.is_none());
         assert!(params.mac.is_none());
@@ -147,7 +152,7 @@ mod test {
         b.ciphers = Some(vec![]);
         b.compression = Some(true);
         b.connect_timeout = Some(Duration::from_secs(1));
-        b.connection_attemps = Some(3);
+        b.connection_attempts = Some(3);
         b.host_name = Some(String::from("192.168.1.2"));
         b.mac = Some(vec![]);
         b.pubkey_accepted_algorithms = Some(vec![]);
@@ -161,7 +166,7 @@ mod test {
         assert!(params.certificate_file.is_some());
         assert!(params.ciphers.is_some());
         assert!(params.compression.is_some());
-        assert!(params.connection_attemps.is_some());
+        assert!(params.connection_attempts.is_some());
         assert!(params.connect_timeout.is_some());
         assert!(params.host_name.is_some());
         assert!(params.mac.is_some());

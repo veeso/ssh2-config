@@ -37,7 +37,7 @@ pub enum Field {
     CertificateFile,
     Ciphers,
     Compression,
-    ConnectionAttemps,
+    ConnectionAttempts,
     ConnectTimeout,
     HostName,
     Mac,
@@ -45,6 +45,7 @@ pub enum Field {
     PubkeyAuthentication,
     RemoteForward,
     TcpKeepAlive,
+    User,
 }
 
 impl FromStr for Field {
@@ -59,7 +60,7 @@ impl FromStr for Field {
             "certificatefile" => Ok(Self::CertificateFile),
             "ciphers" => Ok(Self::Ciphers),
             "compression" => Ok(Self::Compression),
-            "connectionattemps" => Ok(Self::ConnectionAttemps),
+            "connectionattempts" => Ok(Self::ConnectionAttempts),
             "connecttimeout" => Ok(Self::ConnectTimeout),
             "hostname" => Ok(Self::HostName),
             "mac" => Ok(Self::Mac),
@@ -67,6 +68,7 @@ impl FromStr for Field {
             "pubkeyauthentication" => Ok(Self::PubkeyAuthentication),
             "remoteforward" => Ok(Self::RemoteForward),
             "tcpkeepalive" => Ok(Self::TcpKeepAlive),
+            "user" => Ok(Self::User),
             _ => Err("Bad field name"),
         }
     }
@@ -104,8 +106,8 @@ mod test {
             Field::Compression
         );
         assert_eq!(
-            Field::from_str("ConnectionAttemps").ok().unwrap(),
-            Field::ConnectionAttemps
+            Field::from_str("ConnectionAttempts").ok().unwrap(),
+            Field::ConnectionAttempts
         );
         assert_eq!(
             Field::from_str("ConnectTimeout").ok().unwrap(),
