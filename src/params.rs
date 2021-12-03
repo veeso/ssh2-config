@@ -48,6 +48,8 @@ pub struct HostParams {
     pub connection_attempts: Option<usize>,
     /// Specifies the timeout used when connecting to the SSH server
     pub connect_timeout: Option<Duration>,
+    /// Specifies the host key signature algorithms that the client wants to use in order of preference
+    pub host_key_algorithms: Option<Vec<String>>,
     /// Specifies the real host name to log into
     pub host_name: Option<String>,
     /// Specifies the available KEX (Key Exchange) algorithms
@@ -60,6 +62,8 @@ pub struct HostParams {
     pub pubkey_authentication: Option<bool>,
     /// Specifies that a TCP port on the remote machine be forwarded over the secure channel
     pub remote_forward: Option<u16>,
+    /// Sets a timeout interval in seconds after which if no data has been received from the server, keep alive will be sent
+    pub server_alive_interval: Option<Duration>,
     /// Specifies whether to send TCP keepalives to the other side
     pub tcp_keep_alive: Option<bool>,
     /// Specifies the user to log in as.
@@ -93,6 +97,9 @@ impl HostParams {
         if let Some(connect_timeout) = b.connect_timeout {
             self.connect_timeout = Some(connect_timeout);
         }
+        if let Some(host_key_algorithms) = b.host_key_algorithms.clone() {
+            self.host_key_algorithms = Some(host_key_algorithms);
+        }
         if let Some(host_name) = b.host_name.clone() {
             self.host_name = Some(host_name);
         }
@@ -110,6 +117,9 @@ impl HostParams {
         }
         if let Some(remote_forward) = b.remote_forward {
             self.remote_forward = Some(remote_forward);
+        }
+        if let Some(server_alive_interval) = b.server_alive_interval {
+            self.server_alive_interval = Some(server_alive_interval);
         }
         if let Some(tcp_keep_alive) = b.tcp_keep_alive {
             self.tcp_keep_alive = Some(tcp_keep_alive);
@@ -138,12 +148,14 @@ mod test {
         assert!(params.compression.is_none());
         assert!(params.connection_attempts.is_none());
         assert!(params.connect_timeout.is_none());
+        assert!(params.host_key_algorithms.is_none());
         assert!(params.host_name.is_none());
         assert!(params.kex_algorithms.is_none());
         assert!(params.mac.is_none());
         assert!(params.pubkey_accepted_algorithms.is_none());
         assert!(params.pubkey_authentication.is_none());
         assert!(params.remote_forward.is_none());
+        assert!(params.server_alive_interval.is_none());
         assert!(params.tcp_keep_alive.is_none());
     }
 
@@ -159,12 +171,14 @@ mod test {
         b.compression = Some(true);
         b.connect_timeout = Some(Duration::from_secs(1));
         b.connection_attempts = Some(3);
+        b.host_key_algorithms = Some(vec![]);
         b.host_name = Some(String::from("192.168.1.2"));
         b.kex_algorithms = Some(vec![]);
         b.mac = Some(vec![]);
         b.pubkey_accepted_algorithms = Some(vec![]);
         b.pubkey_authentication = Some(true);
         b.remote_forward = Some(32);
+        b.server_alive_interval = Some(Duration::from_secs(10));
         b.tcp_keep_alive = Some(true);
         params.merge(&b);
         assert!(params.bind_address.is_some());
@@ -175,12 +189,14 @@ mod test {
         assert!(params.compression.is_some());
         assert!(params.connection_attempts.is_some());
         assert!(params.connect_timeout.is_some());
+        assert!(params.host_key_algorithms.is_some());
         assert!(params.host_name.is_some());
         assert!(params.kex_algorithms.is_some());
         assert!(params.mac.is_some());
         assert!(params.pubkey_accepted_algorithms.is_some());
         assert!(params.pubkey_authentication.is_some());
         assert!(params.remote_forward.is_some());
+        assert!(params.server_alive_interval.is_some());
         assert!(params.tcp_keep_alive.is_some());
         // merge twices
         b.tcp_keep_alive = None;

@@ -145,6 +145,13 @@ impl SshConfigParser {
                 params.connection_attempts = Some(Self::parse_unsigned(args)?);
             }
             Field::Host => { /* already handled before */ }
+            Field::HostKeyAlgorithms => {
+                let algos = Self::parse_comma_separated_list(args)?;
+                if params.host_key_algorithms.is_none() {
+                    params.host_key_algorithms = Some(Vec::new());
+                }
+                Self::resolve_algorithms(params.host_key_algorithms.as_mut().unwrap(), algos);
+            }
             Field::HostName => {
                 params.host_name = Some(Self::parse_string(args)?);
             }
@@ -177,6 +184,9 @@ impl SshConfigParser {
             }
             Field::RemoteForward => {
                 params.remote_forward = Some(Self::parse_port(args)?);
+            }
+            Field::ServerAliveInterval => {
+                params.server_alive_interval = Some(Self::parse_duration(args)?);
             }
             Field::TcpKeepAlive => {
                 params.tcp_keep_alive = Some(Self::parse_boolean(args)?);
@@ -214,7 +224,6 @@ impl SshConfigParser {
             | Field::HashKnownHosts
             | Field::HostbasedAcceptedAlgorithms
             | Field::HostbasedAuthentication
-            | Field::HostKeyAlgorithms
             | Field::HostKeyAlias
             | Field::IdentitiesOnly
             | Field::IdentityAgent
@@ -246,7 +255,6 @@ impl SshConfigParser {
             | Field::SecruityKeyProvider
             | Field::SendEnv
             | Field::ServerAliveCountMax
-            | Field::ServerAliveInterval
             | Field::SessionType
             | Field::SetEnv
             | Field::StdinNull
@@ -411,6 +419,10 @@ mod test {
         assert_eq!(params.compression.unwrap(), true);
         assert_eq!(params.connection_attempts.unwrap(), 10);
         assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
+        assert_eq!(
+            params.server_alive_interval.unwrap(),
+            Duration::from_secs(40)
+        );
         assert_eq!(params.tcp_keep_alive.unwrap(), true);
         assert_eq!(
             params.ca_signature_algorithms.as_deref().unwrap(),
@@ -419,6 +431,10 @@ mod test {
         assert_eq!(
             params.ciphers.as_deref().unwrap(),
             &["a-manella", "blowfish"]
+        );
+        assert_eq!(
+            params.host_key_algorithms.as_deref().unwrap(),
+            &["luigi", "mario",]
         );
         assert_eq!(
             params.kex_algorithms.as_deref().unwrap(),
@@ -605,6 +621,21 @@ mod test {
     }
 
     #[test]
+    fn should_update_host_key_algorithms() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::HostKeyAlgorithms,
+            vec![String::from("a,b,c")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(
+            params.host_key_algorithms.as_deref().unwrap(),
+            &["a", "b", "c"]
+        );
+    }
+
+    #[test]
     fn should_update_host_host_name() {
         let mut params = HostParams::default();
         assert!(SshConfigParser::update_host(
@@ -678,6 +709,21 @@ mod test {
     }
 
     #[test]
+    fn should_update_host_server_alive_interval() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::ServerAliveInterval,
+            vec![String::from("40")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(
+            params.server_alive_interval.unwrap(),
+            Duration::from_secs(40)
+        );
+    }
+
+    #[test]
     fn should_update_host_tcp_keep_alive() {
         let mut params = HostParams::default();
         assert!(SshConfigParser::update_host(
@@ -699,6 +745,18 @@ mod test {
         )
         .is_ok());
         assert_eq!(params.user.as_deref().unwrap(), "pippo");
+    }
+
+    #[test]
+    fn should_not_update_host_if_unknown() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::AddKeysToAgent,
+            vec![String::from("yes")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params, HostParams::default());
     }
 
     #[test]
@@ -977,12 +1035,14 @@ mod test {
 Compression yes
 ConnectionAttempts          10
 ConnectTimeout 60
+ServerAliveInterval 40
 TcpKeepAlive    yes
 
 CaSignatureAlgorithms   random
 Ciphers     a-manella,blowfish
+HostKeyAlgorithms   luigi,mario
 KexAlgorithms   desu,gigi
-Mac     concorde
+Macs     concorde
 PubkeyAcceptedAlgorithms    desu,omar-crypt,fast-omar-crypt
 
 
@@ -995,7 +1055,7 @@ Host 192.168.*.*    172.26.*.*      !192.168.1.30
     BindAddress     10.8.0.10
     BindInterface   tun0
     Ciphers     +coi-piedi,cazdecan,triestin-stretto
-    Mac     spyro,deoxys
+    Macs     spyro,deoxys
     PubkeyAcceptedAlgorithms    -omar-crypt
 
 Host tostapane

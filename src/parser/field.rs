@@ -42,12 +42,14 @@ pub enum Field {
     Compression,
     ConnectionAttempts,
     ConnectTimeout,
+    HostKeyAlgorithms,
     HostName,
     KexAlgorithms,
     Mac,
     PubkeyAcceptedAlgorithms,
     PubkeyAuthentication,
     RemoteForward,
+    ServerAliveInterval,
     TcpKeepAlive,
     User,
     // -- not implemented
@@ -80,7 +82,6 @@ pub enum Field {
     HashKnownHosts,
     HostbasedAcceptedAlgorithms,
     HostbasedAuthentication,
-    HostKeyAlgorithms,
     HostKeyAlias,
     IdentitiesOnly,
     IdentityAgent,
@@ -112,7 +113,6 @@ pub enum Field {
     SecruityKeyProvider,
     SendEnv,
     ServerAliveCountMax,
-    ServerAliveInterval,
     SessionType,
     SetEnv,
     StdinNull,
@@ -140,12 +140,14 @@ impl FromStr for Field {
             "compression" => Ok(Self::Compression),
             "connectionattempts" => Ok(Self::ConnectionAttempts),
             "connecttimeout" => Ok(Self::ConnectTimeout),
+            "hostkeyalgorithms" => Ok(Self::HostKeyAlgorithms),
             "hostname" => Ok(Self::HostName),
             "kexalgorithms" => Ok(Self::KexAlgorithms),
-            "mac" | "macs" => Ok(Self::Mac),
+            "macs" => Ok(Self::Mac),
             "pubkeyacceptedalgorithms" => Ok(Self::PubkeyAcceptedAlgorithms),
             "pubkeyauthentication" => Ok(Self::PubkeyAuthentication),
             "remoteforward" => Ok(Self::RemoteForward),
+            "serveraliveinterval" => Ok(Self::ServerAliveInterval),
             "tcpkeepalive" => Ok(Self::TcpKeepAlive),
             "user" => Ok(Self::User),
             // -- not implemented fields
@@ -178,7 +180,6 @@ impl FromStr for Field {
             "hashknownhosts" => Ok(Self::HashKnownHosts),
             "hostbasedacceptedalgorithms" => Ok(Self::HostbasedAcceptedAlgorithms),
             "hostbasedauthentication" => Ok(Self::HostbasedAuthentication),
-            "hostkeyalgorithms" => Ok(Self::HostKeyAlgorithms),
             "hostkeyalias" => Ok(Self::HostKeyAlias),
             "identitiesonly" => Ok(Self::IdentitiesOnly),
             "identityagent" => Ok(Self::IdentityAgent),
@@ -210,7 +211,6 @@ impl FromStr for Field {
             "secruitykeyprovider" => Ok(Self::SecruityKeyProvider),
             "sendenv" => Ok(Self::SendEnv),
             "serveralivecountmax" => Ok(Self::ServerAliveCountMax),
-            "serveraliveinterval" => Ok(Self::ServerAliveInterval),
             "sessiontype" => Ok(Self::SessionType),
             "setenv" => Ok(Self::SetEnv),
             "stdinnull" => Ok(Self::StdinNull),
@@ -268,7 +268,7 @@ mod test {
             Field::ConnectTimeout
         );
         assert_eq!(Field::from_str("HostName").ok().unwrap(), Field::HostName);
-        assert_eq!(Field::from_str("Mac").ok().unwrap(), Field::Mac);
+        assert_eq!(Field::from_str("Macs").ok().unwrap(), Field::Mac);
         assert_eq!(
             Field::from_str("PubkeyAcceptedAlgorithms").ok().unwrap(),
             Field::PubkeyAcceptedAlgorithms
@@ -284,6 +284,275 @@ mod test {
         assert_eq!(
             Field::from_str("TcpKeepAlive").ok().unwrap(),
             Field::TcpKeepAlive
+        );
+        assert_eq!(
+            Field::from_str("AddKeysToAgent").ok().unwrap(),
+            Field::AddKeysToAgent
+        );
+        assert_eq!(
+            Field::from_str("AddressFamily").ok().unwrap(),
+            Field::AddressFamily
+        );
+        assert_eq!(Field::from_str("BatchMode").ok().unwrap(), Field::BatchMode);
+        assert_eq!(
+            Field::from_str("CanonicalDomains").ok().unwrap(),
+            Field::CanonicalDomains
+        );
+        assert_eq!(
+            Field::from_str("CanonicalizeFallbackLock").ok().unwrap(),
+            Field::CanonicalizeFallbackLock
+        );
+        assert_eq!(
+            Field::from_str("CanonicalizeHostname").ok().unwrap(),
+            Field::CanonicalizeHostname
+        );
+        assert_eq!(
+            Field::from_str("CanonicalizeMaxDots").ok().unwrap(),
+            Field::CanonicalizeMaxDots
+        );
+        assert_eq!(
+            Field::from_str("CanonicalizePermittedCNAMEs").ok().unwrap(),
+            Field::CanonicalizePermittedCNAMEs
+        );
+        assert_eq!(
+            Field::from_str("CheckHostIP").ok().unwrap(),
+            Field::CheckHostIP
+        );
+        assert_eq!(
+            Field::from_str("ClearAllForwardings").ok().unwrap(),
+            Field::ClearAllForwardings
+        );
+        assert_eq!(
+            Field::from_str("ControlMaster").ok().unwrap(),
+            Field::ControlMaster
+        );
+        assert_eq!(
+            Field::from_str("ControlPath").ok().unwrap(),
+            Field::ControlPath
+        );
+        assert_eq!(
+            Field::from_str("ControlPersist").ok().unwrap(),
+            Field::ControlPersist
+        );
+        assert_eq!(
+            Field::from_str("DynamicForward").ok().unwrap(),
+            Field::DynamicForward
+        );
+        assert_eq!(
+            Field::from_str("EnableSSHKeysign").ok().unwrap(),
+            Field::EnableSSHKeysign
+        );
+        assert_eq!(
+            Field::from_str("EscapeChar").ok().unwrap(),
+            Field::EscapeChar
+        );
+        assert_eq!(
+            Field::from_str("ExitOnForwardFailure").ok().unwrap(),
+            Field::ExitOnForwardFailure
+        );
+        assert_eq!(
+            Field::from_str("FingerprintHash").ok().unwrap(),
+            Field::FingerprintHash
+        );
+        assert_eq!(
+            Field::from_str("ForkAfterAuthentication").ok().unwrap(),
+            Field::ForkAfterAuthentication
+        );
+        assert_eq!(
+            Field::from_str("ForwardAgent").ok().unwrap(),
+            Field::ForwardAgent
+        );
+        assert_eq!(
+            Field::from_str("ForwardX11").ok().unwrap(),
+            Field::ForwardX11
+        );
+        assert_eq!(
+            Field::from_str("ForwardX11Timeout").ok().unwrap(),
+            Field::ForwardX11Timeout
+        );
+        assert_eq!(
+            Field::from_str("GatewayPorts").ok().unwrap(),
+            Field::GatewayPorts
+        );
+        assert_eq!(
+            Field::from_str("GlobalKnownHostsFile").ok().unwrap(),
+            Field::GlobalKnownHostsFile
+        );
+        assert_eq!(
+            Field::from_str("GSSAPIAuthentication").ok().unwrap(),
+            Field::GSSAPIAuthentication
+        );
+        assert_eq!(
+            Field::from_str("GSSAPIDelegateCredentials").ok().unwrap(),
+            Field::GSSAPIDelegateCredentials
+        );
+        assert_eq!(
+            Field::from_str("HashKnownHosts").ok().unwrap(),
+            Field::HashKnownHosts
+        );
+        assert_eq!(
+            Field::from_str("HostbasedAcceptedAlgorithms").ok().unwrap(),
+            Field::HostbasedAcceptedAlgorithms
+        );
+        assert_eq!(
+            Field::from_str("HostbasedAuthentication").ok().unwrap(),
+            Field::HostbasedAuthentication
+        );
+        assert_eq!(
+            Field::from_str("HostKeyAlgorithms").ok().unwrap(),
+            Field::HostKeyAlgorithms
+        );
+        assert_eq!(
+            Field::from_str("HostKeyAlias").ok().unwrap(),
+            Field::HostKeyAlias
+        );
+        assert_eq!(
+            Field::from_str("IdentitiesOnly").ok().unwrap(),
+            Field::IdentitiesOnly
+        );
+        assert_eq!(
+            Field::from_str("IdentityAgent").ok().unwrap(),
+            Field::IdentityAgent
+        );
+        assert_eq!(
+            Field::from_str("IdentityFile").ok().unwrap(),
+            Field::IdentityFile
+        );
+        assert_eq!(
+            Field::from_str("IgnoreUnknown").ok().unwrap(),
+            Field::IgnoreUnknown
+        );
+        assert_eq!(Field::from_str("Include").ok().unwrap(), Field::Include);
+        assert_eq!(Field::from_str("IPQoS").ok().unwrap(), Field::IPQoS);
+        assert_eq!(
+            Field::from_str("KbdInteractiveAuthentication")
+                .ok()
+                .unwrap(),
+            Field::KbdInteractiveAuthentication
+        );
+        assert_eq!(
+            Field::from_str("KbdInteractiveDevices").ok().unwrap(),
+            Field::KbdInteractiveDevices
+        );
+        assert_eq!(
+            Field::from_str("KnownHostsCommand").ok().unwrap(),
+            Field::KnownHostsCommand
+        );
+        assert_eq!(
+            Field::from_str("LocalCommand").ok().unwrap(),
+            Field::LocalCommand
+        );
+        assert_eq!(
+            Field::from_str("LocalForward").ok().unwrap(),
+            Field::LocalForward
+        );
+        assert_eq!(Field::from_str("LogLevel").ok().unwrap(), Field::LogLevel);
+        assert_eq!(
+            Field::from_str("LogVerbose").ok().unwrap(),
+            Field::LogVerbose
+        );
+        assert_eq!(
+            Field::from_str("NoHostAuthenticationForLocalhost")
+                .ok()
+                .unwrap(),
+            Field::NoHostAuthenticationForLocalhost
+        );
+        assert_eq!(
+            Field::from_str("NumberOfPasswordPrompts").ok().unwrap(),
+            Field::NumberOfPasswordPrompts
+        );
+        assert_eq!(
+            Field::from_str("PasswordAuthentication").ok().unwrap(),
+            Field::PasswordAuthentication
+        );
+        assert_eq!(
+            Field::from_str("PermitLocalCommand").ok().unwrap(),
+            Field::PermitLocalCommand
+        );
+        assert_eq!(
+            Field::from_str("PermitRemoteOpen").ok().unwrap(),
+            Field::PermitRemoteOpen
+        );
+        assert_eq!(
+            Field::from_str("PKCS11Provider").ok().unwrap(),
+            Field::PKCS11Provider
+        );
+        assert_eq!(Field::from_str("Port").ok().unwrap(), Field::Port);
+        assert_eq!(
+            Field::from_str("PreferredAuthentications").ok().unwrap(),
+            Field::PreferredAuthentications
+        );
+        assert_eq!(
+            Field::from_str("ProxyCommand").ok().unwrap(),
+            Field::ProxyCommand
+        );
+        assert_eq!(Field::from_str("ProxyJump").ok().unwrap(), Field::ProxyJump);
+        assert_eq!(
+            Field::from_str("ProxyUseFdpass").ok().unwrap(),
+            Field::ProxyUseFdpass
+        );
+        assert_eq!(
+            Field::from_str("RekeyLimit").ok().unwrap(),
+            Field::RekeyLimit
+        );
+        assert_eq!(
+            Field::from_str("RequestTTY").ok().unwrap(),
+            Field::RequestTTY
+        );
+        assert_eq!(
+            Field::from_str("RevokedHostKeys").ok().unwrap(),
+            Field::RevokedHostKeys
+        );
+        assert_eq!(
+            Field::from_str("SecruityKeyProvider").ok().unwrap(),
+            Field::SecruityKeyProvider
+        );
+        assert_eq!(Field::from_str("SendEnv").ok().unwrap(), Field::SendEnv);
+        assert_eq!(
+            Field::from_str("ServerAliveCountMax").ok().unwrap(),
+            Field::ServerAliveCountMax
+        );
+        assert_eq!(
+            Field::from_str("ServerAliveInterval").ok().unwrap(),
+            Field::ServerAliveInterval
+        );
+        assert_eq!(
+            Field::from_str("SessionType").ok().unwrap(),
+            Field::SessionType
+        );
+        assert_eq!(Field::from_str("SetEnv").ok().unwrap(), Field::SetEnv);
+        assert_eq!(Field::from_str("StdinNull").ok().unwrap(), Field::StdinNull);
+        assert_eq!(
+            Field::from_str("StreamLocalBindMask").ok().unwrap(),
+            Field::StreamLocalBindMask
+        );
+        assert_eq!(
+            Field::from_str("StrictHostKeyChecking").ok().unwrap(),
+            Field::StrictHostKeyChecking
+        );
+        assert_eq!(
+            Field::from_str("SyslogFacility").ok().unwrap(),
+            Field::SyslogFacility
+        );
+        assert_eq!(
+            Field::from_str("UpdateHostKeys").ok().unwrap(),
+            Field::UpdateHostKeys
+        );
+        assert_eq!(
+            Field::from_str("UserKnownHostsFile").ok().unwrap(),
+            Field::UserKnownHostsFile
+        );
+        assert_eq!(
+            Field::from_str("VerifyHostKeyDNS").ok().unwrap(),
+            Field::VerifyHostKeyDNS
+        );
+        assert_eq!(
+            Field::from_str("VisualHostKey").ok().unwrap(),
+            Field::VisualHostKey
+        );
+        assert_eq!(
+            Field::from_str("XAuthLocation").ok().unwrap(),
+            Field::XAuthLocation
         );
     }
 
