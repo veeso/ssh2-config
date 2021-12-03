@@ -82,9 +82,13 @@ fn connect(host: &str, params: &HostParams) {
         Some(h) => h,
         None => host,
     };
+    let port = match params.port {
+        None => 22,
+        Some(p) => p,
+    };
     let host = match host.contains(':') {
         true => host.to_string(),
-        false => format!("{}:22", host),
+        false => format!("{}:{}", host, port),
     };
     println!("Connecting to host {}...", host);
     let socket_addresses: Vec<SocketAddr> = match host.to_socket_addrs() {

@@ -169,6 +169,9 @@ impl SshConfigParser {
                 }
                 Self::resolve_algorithms(params.mac.as_mut().unwrap(), algos);
             }
+            Field::Port => {
+                params.port = Some(Self::parse_port(args)?);
+            }
             Field::PubkeyAcceptedAlgorithms => {
                 let algos = Self::parse_comma_separated_list(args)?;
                 if params.pubkey_accepted_algorithms.is_none() {
@@ -244,7 +247,6 @@ impl SshConfigParser {
             | Field::PermitLocalCommand
             | Field::PermitRemoteOpen
             | Field::PKCS11Provider
-            | Field::Port
             | Field::PreferredAuthentications
             | Field::ProxyCommand
             | Field::ProxyJump
@@ -473,6 +475,7 @@ mod test {
         );
         assert_eq!(params.bind_address.as_deref().unwrap(), "10.8.0.10");
         assert_eq!(params.bind_interface.as_deref().unwrap(), "tun0");
+        assert_eq!(params.port.unwrap(), 2222);
         assert_eq!(params.user.as_deref().unwrap(), "omar");
         // Query tostapane
         let params = config.query("tostapane");
@@ -667,6 +670,16 @@ mod test {
                 .is_ok()
         );
         assert_eq!(params.mac.as_deref().unwrap(), &["a", "b", "c"]);
+    }
+
+    #[test]
+    fn should_update_host_port() {
+        let mut params = HostParams::default();
+        assert!(
+            SshConfigParser::update_host(Field::Port, vec![String::from("2222")], &mut params)
+                .is_ok()
+        );
+        assert_eq!(params.port.unwrap(), 2222);
     }
 
     #[test]
@@ -1056,6 +1069,7 @@ Host 192.168.*.*    172.26.*.*      !192.168.1.30
     BindInterface   tun0
     Ciphers     +coi-piedi,cazdecan,triestin-stretto
     Macs     spyro,deoxys
+    Port 2222
     PubkeyAcceptedAlgorithms    -omar-crypt
 
 Host tostapane

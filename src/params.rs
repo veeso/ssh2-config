@@ -56,6 +56,8 @@ pub struct HostParams {
     pub kex_algorithms: Option<Vec<String>>,
     /// Specifies the MAC (message authentication code) algorithms in order of preference
     pub mac: Option<Vec<String>>,
+    /// Specifies the port number to connect on the remote host.
+    pub port: Option<u16>,
     /// Specifies the signature algorithms that will be used for public key authentication
     pub pubkey_accepted_algorithms: Option<Vec<String>>,
     /// Specifies whether to try public key authentication using SSH keys
@@ -109,6 +111,9 @@ impl HostParams {
         if let Some(mac) = b.mac.clone() {
             self.mac = Some(mac);
         }
+        if let Some(port) = b.port {
+            self.port = Some(port);
+        }
         if let Some(pubkey_accepted_algorithms) = b.pubkey_accepted_algorithms.clone() {
             self.pubkey_accepted_algorithms = Some(pubkey_accepted_algorithms);
         }
@@ -152,6 +157,7 @@ mod test {
         assert!(params.host_name.is_none());
         assert!(params.kex_algorithms.is_none());
         assert!(params.mac.is_none());
+        assert!(params.port.is_none());
         assert!(params.pubkey_accepted_algorithms.is_none());
         assert!(params.pubkey_authentication.is_none());
         assert!(params.remote_forward.is_none());
@@ -175,6 +181,7 @@ mod test {
         b.host_name = Some(String::from("192.168.1.2"));
         b.kex_algorithms = Some(vec![]);
         b.mac = Some(vec![]);
+        b.port = Some(22);
         b.pubkey_accepted_algorithms = Some(vec![]);
         b.pubkey_authentication = Some(true);
         b.remote_forward = Some(32);
@@ -193,6 +200,7 @@ mod test {
         assert!(params.host_name.is_some());
         assert!(params.kex_algorithms.is_some());
         assert!(params.mac.is_some());
+        assert!(params.port.is_some());
         assert!(params.pubkey_accepted_algorithms.is_some());
         assert!(params.pubkey_authentication.is_some());
         assert!(params.remote_forward.is_some());
