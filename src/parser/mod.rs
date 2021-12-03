@@ -54,6 +54,8 @@ pub enum SshParserError {
     ExpectedPath,
     #[error("missing argument")]
     MissingArgument,
+    #[error("unknown field: {0}")]
+    UnknownField(String),
     #[error("IO error: {0}")]
     Io(IoError),
 }
@@ -82,8 +84,7 @@ impl SshConfigParser {
             }
             // tokenize
             let (field, args) = match Self::tokenize(&line) {
-                Ok(Some((field, args))) => (field, args),
-                Ok(None) => continue, // Unsupported field
+                Ok((field, args)) => (field, args),
                 Err(err) => return Err(err),
             };
             // If field is block, init a new block
@@ -147,6 +148,13 @@ impl SshConfigParser {
             Field::HostName => {
                 params.host_name = Some(Self::parse_string(args)?);
             }
+            Field::KexAlgorithms => {
+                let algos = Self::parse_comma_separated_list(args)?;
+                if params.kex_algorithms.is_none() {
+                    params.kex_algorithms = Some(Vec::new());
+                }
+                Self::resolve_algorithms(params.kex_algorithms.as_mut().unwrap(), algos);
+            }
             Field::Mac => {
                 let algos = Self::parse_comma_separated_list(args)?;
                 if params.mac.is_none() {
@@ -176,6 +184,80 @@ impl SshConfigParser {
             Field::User => {
                 params.user = Some(Self::parse_string(args)?);
             }
+            // -- unimplemented fields
+            Field::AddKeysToAgent
+            | Field::AddressFamily
+            | Field::BatchMode
+            | Field::CanonicalDomains
+            | Field::CanonicalizeFallbackLock
+            | Field::CanonicalizeHostname
+            | Field::CanonicalizeMaxDots
+            | Field::CanonicalizePermittedCNAMEs
+            | Field::CheckHostIP
+            | Field::ClearAllForwardings
+            | Field::ControlMaster
+            | Field::ControlPath
+            | Field::ControlPersist
+            | Field::DynamicForward
+            | Field::EnableSSHKeysign
+            | Field::EscapeChar
+            | Field::ExitOnForwardFailure
+            | Field::FingerprintHash
+            | Field::ForkAfterAuthentication
+            | Field::ForwardAgent
+            | Field::ForwardX11
+            | Field::ForwardX11Timeout
+            | Field::GatewayPorts
+            | Field::GlobalKnownHostsFile
+            | Field::GSSAPIAuthentication
+            | Field::GSSAPIDelegateCredentials
+            | Field::HashKnownHosts
+            | Field::HostbasedAcceptedAlgorithms
+            | Field::HostbasedAuthentication
+            | Field::HostKeyAlgorithms
+            | Field::HostKeyAlias
+            | Field::IdentitiesOnly
+            | Field::IdentityAgent
+            | Field::IdentityFile
+            | Field::IgnoreUnknown
+            | Field::Include
+            | Field::IPQoS
+            | Field::KbdInteractiveAuthentication
+            | Field::KbdInteractiveDevices
+            | Field::KnownHostsCommand
+            | Field::LocalCommand
+            | Field::LocalForward
+            | Field::LogLevel
+            | Field::LogVerbose
+            | Field::NoHostAuthenticationForLocalhost
+            | Field::NumberOfPasswordPrompts
+            | Field::PasswordAuthentication
+            | Field::PermitLocalCommand
+            | Field::PermitRemoteOpen
+            | Field::PKCS11Provider
+            | Field::Port
+            | Field::PreferredAuthentications
+            | Field::ProxyCommand
+            | Field::ProxyJump
+            | Field::ProxyUseFdpass
+            | Field::RekeyLimit
+            | Field::RequestTTY
+            | Field::RevokedHostKeys
+            | Field::SecruityKeyProvider
+            | Field::SendEnv
+            | Field::ServerAliveCountMax
+            | Field::ServerAliveInterval
+            | Field::SessionType
+            | Field::SetEnv
+            | Field::StdinNull
+            | Field::StreamLocalBindMask
+            | Field::StrictHostKeyChecking
+            | Field::SyslogFacility
+            | Field::UpdateHostKeys
+            | Field::UserKnownHostsFile
+            | Field::VerifyHostKeyDNS
+            | Field::VisualHostKey
+            | Field::XAuthLocation => { /* Ignore fields */ }
         }
         Ok(())
     }
@@ -207,18 +289,18 @@ impl SshConfigParser {
     }
 
     /// Tokenize line if possible. Returns field name and args
-    fn tokenize(line: &str) -> SshParserResult<Option<(Field, Vec<String>)>> {
+    fn tokenize(line: &str) -> SshParserResult<(Field, Vec<String>)> {
         let mut tokens = line.trim().split_whitespace();
         let field = match tokens.next().map(Field::from_str) {
             Some(Ok(field)) => field,
-            Some(Err(_)) => return Ok(None),
+            Some(Err(field)) => return Err(SshParserError::UnknownField(field)),
             None => return Err(SshParserError::MissingArgument),
         };
         let args = tokens
             .map(|x| x.trim().to_string())
             .filter(|x| !x.is_empty())
             .collect();
-        Ok(Some((field, args)))
+        Ok((field, args))
     }
 
     // -- value parsers
@@ -337,6 +419,10 @@ mod test {
         assert_eq!(
             params.ciphers.as_deref().unwrap(),
             &["a-manella", "blowfish"]
+        );
+        assert_eq!(
+            params.kex_algorithms.as_deref().unwrap(),
+            &["desu", "gigi",]
         );
         assert_eq!(params.mac.as_deref().unwrap(), &["concorde"]);
         assert_eq!(
@@ -531,6 +617,18 @@ mod test {
     }
 
     #[test]
+    fn should_update_kex_algorithms() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::KexAlgorithms,
+            vec![String::from("a,b,c")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.kex_algorithms.as_deref().unwrap(), &["a", "b", "c"]);
+    }
+
+    #[test]
     fn should_update_host_mac() {
         let mut params = HostParams::default();
         assert!(
@@ -685,7 +783,6 @@ mod test {
         assert_eq!(
             SshConfigParser::tokenize("HostName 192.168.*.* 172.26.*.*")
                 .ok()
-                .unwrap()
                 .unwrap(),
             (
                 Field::HostName,
@@ -698,7 +795,6 @@ mod test {
                 "      HostName        192.168.*.*        172.26.*.*        "
             )
             .ok()
-            .unwrap()
             .unwrap(),
             (
                 Field::HostName,
@@ -709,10 +805,7 @@ mod test {
 
     #[test]
     fn should_not_tokenize_line() {
-        assert!(SshConfigParser::tokenize("Omar     yes")
-            .ok()
-            .unwrap()
-            .is_none());
+        assert!(SshConfigParser::tokenize("Omar     yes").is_err());
     }
 
     #[test]
@@ -888,6 +981,7 @@ TcpKeepAlive    yes
 
 CaSignatureAlgorithms   random
 Ciphers     a-manella,blowfish
+KexAlgorithms   desu,gigi
 Mac     concorde
 PubkeyAcceptedAlgorithms    desu,omar-crypt,fast-omar-crypt
 

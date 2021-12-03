@@ -50,6 +50,8 @@ pub struct HostParams {
     pub connect_timeout: Option<Duration>,
     /// Specifies the real host name to log into
     pub host_name: Option<String>,
+    /// Specifies the available KEX (Key Exchange) algorithms
+    pub kex_algorithms: Option<Vec<String>>,
     /// Specifies the MAC (message authentication code) algorithms in order of preference
     pub mac: Option<Vec<String>>,
     /// Specifies the signature algorithms that will be used for public key authentication
@@ -94,6 +96,9 @@ impl HostParams {
         if let Some(host_name) = b.host_name.clone() {
             self.host_name = Some(host_name);
         }
+        if let Some(kex_algorithms) = b.kex_algorithms.clone() {
+            self.kex_algorithms = Some(kex_algorithms);
+        }
         if let Some(mac) = b.mac.clone() {
             self.mac = Some(mac);
         }
@@ -134,6 +139,7 @@ mod test {
         assert!(params.connection_attempts.is_none());
         assert!(params.connect_timeout.is_none());
         assert!(params.host_name.is_none());
+        assert!(params.kex_algorithms.is_none());
         assert!(params.mac.is_none());
         assert!(params.pubkey_accepted_algorithms.is_none());
         assert!(params.pubkey_authentication.is_none());
@@ -154,6 +160,7 @@ mod test {
         b.connect_timeout = Some(Duration::from_secs(1));
         b.connection_attempts = Some(3);
         b.host_name = Some(String::from("192.168.1.2"));
+        b.kex_algorithms = Some(vec![]);
         b.mac = Some(vec![]);
         b.pubkey_accepted_algorithms = Some(vec![]);
         b.pubkey_authentication = Some(true);
@@ -169,6 +176,7 @@ mod test {
         assert!(params.connection_attempts.is_some());
         assert!(params.connect_timeout.is_some());
         assert!(params.host_name.is_some());
+        assert!(params.kex_algorithms.is_some());
         assert!(params.mac.is_some());
         assert!(params.pubkey_accepted_algorithms.is_some());
         assert!(params.pubkey_authentication.is_some());
