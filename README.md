@@ -85,23 +85,23 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 
 ### Exposed attributes
 
-- BindAddress: you can use this attribute to bind the socket to a certain address
-- BindInterface: you can use this attribute to bind the socket to a certain network interface
-- CASignatureAlgorithms: you can use this attribute to handle CA certificates
-- CertificateFile: you can use this attribute to parse the certificate file in case is necessary
-- Ciphers: you can use this attribute to set preferred methods with the session method `session.method_pref(MethodType::CryptCs, ...)` and `session.method_pref(MethodType::CryptSc, ...)`
-- Compression: you can use this attribute to set whether compression is enabled with `session.set_compress(value)`
-- ConnectionAttempts: you can use this attribute to cycle over connect in order to retry
-- ConnectTimeout: you can use this attribute to set the connection timeout for the socket
-- HostName: you can use this attribute to get the real name of the host to connect to
-- KexAlgorithms: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.join(",").as_str())`
-- MACs: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos.join(",").as_str())` and `session.method_pref(MethodType::MacSc, algos.join(",").as_str())`
-- Port: you can use this attribute to resolve the port to connect to
-- PubkeyAuthentication: you can use this attribute to set whether to use the pubkey authentication
-- RemoteForward: you can use this method to implement port forwarding with `session.channel_forward_listen()`
-- ServerAliveInterval: you can use this method to implement keep alive message interval
-- TcpKeepAlive: you can use this method to tell whether to send keep alive message
-- User: you can use this method to resolve the user to use to log in as
+- **BindAddress**: you can use this attribute to bind the socket to a certain address
+- **BindInterface**: you can use this attribute to bind the socket to a certain network interface
+- **CASignatureAlgorithms**: you can use this attribute to handle CA certificates
+- **CertificateFile**: you can use this attribute to parse the certificate file in case is necessary
+- **Ciphers**: you can use this attribute to set preferred methods with the session method `session.method_pref(MethodType::CryptCs, ...)` and `session.method_pref(MethodType::CryptSc, ...)`
+- **Compression**: you can use this attribute to set whether compression is enabled with `session.set_compress(value)`
+- **ConnectionAttempts**: you can use this attribute to cycle over connect in order to retry
+- **ConnectTimeout**: you can use this attribute to set the connection timeout for the socket
+- **HostName**: you can use this attribute to get the real name of the host to connect to
+- **KexAlgorithms**: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.join(",").as_str())`
+- **MACs**: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos.join(",").as_str())` and `session.method_pref(MethodType::MacSc, algos.join(",").as_str())`
+- **Port**: you can use this attribute to resolve the port to connect to
+- **PubkeyAuthentication**: you can use this attribute to set whether to use the pubkey authentication
+- **RemoteForward**: you can use this method to implement port forwarding with `session.channel_forward_listen()`
+- **ServerAliveInterval**: you can use this method to implement keep alive message interval
+- **TcpKeepAlive**: you can use this method to tell whether to send keep alive message
+- **User**: you can use this method to resolve the user to use to log in as
 
 ### Missing features
 
@@ -122,12 +122,12 @@ ssh2-config = "^0.1.0"
 then parse the configuration
 
 ```rust
-use ssh2_config::{SshConfig, SshConfigParser};
+use ssh2_config::{SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 
 let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-let config = SshConfigParser::default().parse(&mut reader).expect("Failed to parse configuration");
+let config = SshConfig::default().parse(&mut reader).expect("Failed to parse configuration");
 
 // Query attributes for a certain host
 let params = config.query("192.168.1.2");

@@ -3,7 +3,18 @@
 
 //! # ssh2-config
 //!
-//! ssh2-config TODO:
+//! ssh2-config a library which provides a parser for the SSH configuration file,
+//! to be used in pair with the [ssh2](https://github.com/alexcrichton/ssh2-rs) crate.
+//!
+//! This library provides a method to parse the configuration file and returns the
+//! configuration parsed into a structure.
+//! The `SshConfig` structure provides all the attributes which **can** be used to configure the **ssh2 Session**
+//! and to resolve the host, port and username.
+//!
+//! Once the configuration has been parsed you can use the `query(&str)`
+//! method to query configuration for a certain host, based on the configured patterns.
+//! Even if many attributes are not exposed, since not supported, there is anyway a validation of the configuration,
+//! so invalid configuration will result in a parsing error.
 //!
 //! ## Get started
 //!
@@ -13,11 +24,30 @@
 //! ssh2-config = "^0.1.0"
 //! ```
 //!
-//! ## Usage
+//! ## Example
 //!
-//! Here is a basic usage example:
+//! Here is a basic example:
 //!
 //! ```rust
+//!
+//! use ssh2::Session;
+//! use ssh2_config::{HostParams, SshConfig};
+//! use std::fs::File;
+//! use std::io::BufReader;
+//! use std::path::Path;
+//!
+//! let mut reader = BufReader::new(
+//!     File::open(Path::new("./assets/ssh.config"))
+//!         .expect("Could not open configuration file")
+//! );
+//!
+//! let config = SshConfig::default().parse(&mut reader).expect("Failed to parse configuration");
+//!
+//! let default_params = config.default_params();
+//! // Query parameters for your host
+//! // If there's no rule for your host, default params are returned
+//! let params = config.query("192.168.1.2");
+//!
 //! ```
 //!
 
