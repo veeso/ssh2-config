@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">Developed by <a href="https://veeso.github.io/" target="_blank">@veeso</a></p>
-<p align="center">Current version: 0.1.0 (FIXME: 31/08/2021)</p>
+<p align="center">Current version: 0.1.0 (04/12/2021)</p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"
@@ -32,10 +32,10 @@
       src="https://img.shields.io/crates/v/ssh2-config.svg"
       alt="Latest version"
   /></a>
-  <a href="https://www.buymeacoffee.com/veeso">
+  <a href="https://ko-fi.com/E1E079AAD">
     <img
-      src="https://img.shields.io/badge/Donate-BuyMeACoffee-yellow.svg"
-      alt="Buy me a coffee"
+      src="https://ko-fi.com/img/githubbutton_sm.svg"
+      alt="Kofi"
   /></a>
 </p>
 <p align="center">
@@ -58,19 +58,134 @@
 
 ---
 
-## About ssh2-config ☁️
+- [ssh2-config](#ssh2-config)
+  - [About ssh2-config](#about-ssh2-config)
+    - [Exposed attributes](#exposed-attributes)
+    - [Missing features](#missing-features)
+  - [Get started 🚀](#get-started-)
+    - [Examples](#examples)
+  - [Support the developer ☕](#support-the-developer-)
+  - [Contributing and issues 🤝🏻](#contributing-and-issues-)
+  - [Changelog ⏳](#changelog-)
+  - [License 📃](#license-)
 
-TODO:
+---
 
-### Missing features 😞
+## About ssh2-config
 
+ssh2-config a library which provides a parser for the SSH configuration file, to be used in pair with the [ssh2](https://github.com/alexcrichton/ssh2-rs) crate.
+
+This library provides a method to parse the configuration file and returns the configuration parsed into a structure.
+The `SshConfig` structure provides all the attributes which **can** be used to configure the **ssh2 Session** and to resolve
+the host, port and username.
+
+Once the configuration has been parsed you can use the `query(&str)` method to query configuration for a certain host, based on the configured patterns.
+
+Even if many attributes are not exposed, since not supported, there is anyway a validation of the configuration, so invalid configuration will result in a parsing error.
+
+### Exposed attributes
+
+- BindAddress: you can use this attribute to bind the socket to a certain address
+- BindInterface: you can use this attribute to bind the socket to a certain network interface
+- CASignatureAlgorithms: you can use this attribute to handle CA certificates
+- CertificateFile: you can use this attribute to parse the certificate file in case is necessary
+- Ciphers: you can use this attribute to set preferred methods with the session method `session.method_pref(MethodType::CryptCs, ...)` and `session.method_pref(MethodType::CryptSc, ...)`
+- Compression: you can use this attribute to set whether compression is enabled with `session.set_compress(value)`
+- ConnectionAttempts: you can use this attribute to cycle over connect in order to retry
+- ConnectTimeout: you can use this attribute to set the connection timeout for the socket
+- HostName: you can use this attribute to get the real name of the host to connect to
+- KexAlgorithms: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.join(",").as_str())`
+- MACs: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos.join(",").as_str())` and `session.method_pref(MethodType::MacSc, algos.join(",").as_str())`
+- Port: you can use this attribute to resolve the port to connect to
+- PubkeyAuthentication: you can use this attribute to set whether to use the pubkey authentication
+- RemoteForward: you can use this method to implement port forwarding with `session.channel_forward_listen()`
+- ServerAliveInterval: you can use this method to implement keep alive message interval
+- TcpKeepAlive: you can use this method to tell whether to send keep alive message
+- User: you can use this method to resolve the user to use to log in as
+
+### Missing features
+
+- [Match patterns](http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Match) (Host patterns are supported!!!)
 - [Tokens](http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#TOKENS)
 
 ---
 
 ## Get started 🚀
 
-TODO:
+First of all, add ssh2-config to your dependencies
+
+```toml
+[dependencies]
+ssh2-config = "^0.1.0"
+```
+
+then parse the configuration
+
+```rust
+use ssh2_config::{SshConfig, SshConfigParser};
+use std::fs::File;
+use std::io::BufReader;
+
+let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+let config = SshConfigParser::default().parse(&mut reader).expect("Failed to parse configuration");
+
+// Query attributes for a certain host
+let params = config.query("192.168.1.2");
+```
+
+then you can use the parsed parameters to configure the session:
+
+```rust
+use ssh2::Session;
+use ssh2_config::{HostParams};
+
+fn configure_session(session: &mut Session, params: &HostParams) {
+    if let Some(compress) = params.compression {
+        session.set_compress(compress);
+    }
+    if params.tcp_keep_alive.unwrap_or(false) && params.server_alive_interval.is_some() {
+        let interval = params.server_alive_interval.unwrap().as_secs() as u32;
+        session.set_keepalive(true, interval);
+    }
+    // algos
+    if let Some(algos) = params.kex_algorithms.as_deref() {
+        if let Err(err) = session.method_pref(MethodType::Kex, algos.join(",").as_str()) {
+            panic!("Could not set KEX algorithms: {}", err);
+        }
+    }
+    if let Some(algos) = params.host_key_algorithms.as_deref() {
+        if let Err(err) = session.method_pref(MethodType::HostKey, algos.join(",").as_str()) {
+            panic!("Could not set host key algorithms: {}", err);
+        }
+    }
+    if let Some(algos) = params.ciphers.as_deref() {
+        if let Err(err) = session.method_pref(MethodType::CryptCs, algos.join(",").as_str()) {
+            panic!("Could not set crypt algorithms (client-server): {}", err);
+        }
+        if let Err(err) = session.method_pref(MethodType::CryptSc, algos.join(",").as_str()) {
+            panic!("Could not set crypt algorithms (server-client): {}", err);
+        }
+    }
+    if let Some(algos) = params.mac.as_deref() {
+        if let Err(err) = session.method_pref(MethodType::MacCs, algos.join(",").as_str()) {
+            panic!("Could not set MAC algorithms (client-server): {}", err);
+        }
+        if let Err(err) = session.method_pref(MethodType::MacSc, algos.join(",").as_str()) {
+            panic!("Could not set MAC algorithms (server-client): {}", err);
+        }
+    }
+}
+```
+
+### Examples
+
+You can view a working examples of an implementation of ssh2-config with ssh2 in the examples folder at [client.rs](examples/client.rs).
+
+You can run the example with
+
+```sh
+cargo run --example client -- <remote-host> [config-file-path]
+```
 
 ---
 
@@ -80,7 +195,7 @@ If you like ssh2-config and you're grateful for the work I've done, please consi
 
 You can make a donation with one of these platforms:
 
-[![Buy-me-a-coffee](https://img.shields.io/badge/-buy_me_a%C2%A0coffee-gray?style=for-the-badge&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/veeso)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/E1E079AAD)
 [![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.me/chrisintin)
 
 ---
