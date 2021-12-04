@@ -34,8 +34,8 @@
   /></a>
   <a href="https://ko-fi.com/E1E079AAD">
     <img
-      src="https://ko-fi.com/img/githubbutton_sm.svg"
-      alt="Kofi"
+      src="https://img.shields.io/badge/donate-ko--fi-red"
+      alt="Ko-fi"
   /></a>
 </p>
 <p align="center">
@@ -195,7 +195,7 @@ If you like ssh2-config and you're grateful for the work I've done, please consi
 
 You can make a donation with one of these platforms:
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/E1E079AAD)
+[![ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/E1E079AAD)
 [![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.me/chrisintin)
 
 ---
