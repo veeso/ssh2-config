@@ -44,6 +44,7 @@ pub enum Field {
     ConnectTimeout,
     HostKeyAlgorithms,
     HostName,
+    IdentityFile,
     KexAlgorithms,
     Mac,
     Port,
@@ -86,7 +87,6 @@ pub enum Field {
     HostKeyAlias,
     IdentitiesOnly,
     IdentityAgent,
-    IdentityFile,
     IgnoreUnknown,
     Include,
     IPQoS,
@@ -142,6 +142,7 @@ impl FromStr for Field {
             "connecttimeout" => Ok(Self::ConnectTimeout),
             "hostkeyalgorithms" => Ok(Self::HostKeyAlgorithms),
             "hostname" => Ok(Self::HostName),
+            "identityfile" => Ok(Self::IdentityFile),
             "kexalgorithms" => Ok(Self::KexAlgorithms),
             "macs" => Ok(Self::Mac),
             "port" => Ok(Self::Port),
@@ -184,7 +185,6 @@ impl FromStr for Field {
             "hostkeyalias" => Ok(Self::HostKeyAlias),
             "identitiesonly" => Ok(Self::IdentitiesOnly),
             "identityagent" => Ok(Self::IdentityAgent),
-            "identityfile" => Ok(Self::IdentityFile),
             "ignoreunknown" => Ok(Self::IgnoreUnknown),
             "include" => Ok(Self::Include),
             "ipqos" => Ok(Self::IPQoS),
@@ -268,6 +268,10 @@ mod test {
             Field::ConnectTimeout
         );
         assert_eq!(Field::from_str("HostName").ok().unwrap(), Field::HostName);
+        assert_eq!(
+            Field::from_str("IdentityFile").ok().unwrap(),
+            Field::IdentityFile
+        );
         assert_eq!(Field::from_str("Macs").ok().unwrap(), Field::Mac);
         assert_eq!(
             Field::from_str("PubkeyAcceptedAlgorithms").ok().unwrap(),
@@ -413,10 +417,6 @@ mod test {
         assert_eq!(
             Field::from_str("IdentityAgent").ok().unwrap(),
             Field::IdentityAgent
-        );
-        assert_eq!(
-            Field::from_str("IdentityFile").ok().unwrap(),
-            Field::IdentityFile
         );
         assert_eq!(
             Field::from_str("IgnoreUnknown").ok().unwrap(),

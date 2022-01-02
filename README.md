@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">Developed by <a href="https://veeso.github.io/" target="_blank">@veeso</a></p>
-<p align="center">Current version: 0.1.0 (04/12/2021)</p>
+<p align="center">Current version: 0.1.1 (02/01/2022)</p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"
@@ -94,6 +94,7 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 - **ConnectionAttempts**: you can use this attribute to cycle over connect in order to retry
 - **ConnectTimeout**: you can use this attribute to set the connection timeout for the socket
 - **HostName**: you can use this attribute to get the real name of the host to connect to
+- **IdentityFile**: you can use this attribute to set the keys to try when connecting to remote host.
 - **KexAlgorithms**: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.join(",").as_str())`
 - **MACs**: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos.join(",").as_str())` and `session.method_pref(MethodType::MacSc, algos.join(",").as_str())`
 - **Port**: you can use this attribute to resolve the port to connect to
@@ -116,7 +117,7 @@ First of all, add ssh2-config to your dependencies
 
 ```toml
 [dependencies]
-ssh2-config = "^0.1.0"
+ssh2-config = "^0.1.1"
 ```
 
 then parse the configuration
@@ -175,6 +176,20 @@ fn configure_session(session: &mut Session, params: &HostParams) {
         }
     }
 }
+
+fn auth_with_rsakey(
+    session: &mut Session,
+    params: &HostParams,
+    username: &str,
+    password: Option<&str>
+) {
+    for identity_file in params.identity_file.unwrap_or_default().iter() {
+        if let Ok(_) = session.userauth_pubkey_file(username, None, identity_file, password) {
+            break;
+        } 
+    }
+}
+
 ```
 
 ### Examples

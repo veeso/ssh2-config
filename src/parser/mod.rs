@@ -155,6 +155,9 @@ impl SshConfigParser {
             Field::HostName => {
                 params.host_name = Some(Self::parse_string(args)?);
             }
+            Field::IdentityFile => {
+                params.identity_file = Some(Self::parse_path_list(args)?);
+            }
             Field::KexAlgorithms => {
                 let algos = Self::parse_comma_separated_list(args)?;
                 if params.kex_algorithms.is_none() {
@@ -230,7 +233,6 @@ impl SshConfigParser {
             | Field::HostKeyAlias
             | Field::IdentitiesOnly
             | Field::IdentityAgent
-            | Field::IdentityFile
             | Field::IgnoreUnknown
             | Field::Include
             | Field::IPQoS
@@ -361,13 +363,35 @@ impl SshConfigParser {
             .collect())
     }
 
+    /// Parse a list of paths
+    fn parse_path_list(args: Vec<String>) -> SshParserResult<Vec<PathBuf>> {
+        args.iter()
+            .map(|x| Self::parse_path_arg(x.as_str()))
+            .collect()
+    }
+
     /// Parse path argument
     fn parse_path(args: Vec<String>) -> SshParserResult<PathBuf> {
         if let Some(s) = args.get(0) {
-            Ok(PathBuf::from(s))
+            Self::parse_path_arg(s)
         } else {
             Err(SshParserError::MissingArgument)
         }
+    }
+
+    /// Parse path argument
+    fn parse_path_arg(s: &str) -> SshParserResult<PathBuf> {
+        // Remove tilde
+        let s = if s.starts_with('~') {
+            let home_dir = dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("~"))
+                .to_string_lossy()
+                .to_string();
+            s.replacen('~', &home_dir, 1)
+        } else {
+            s.to_string()
+        };
+        Ok(PathBuf::from(s))
     }
 
     /// Parse port number argument
@@ -476,6 +500,13 @@ mod test {
         assert_eq!(params.bind_address.as_deref().unwrap(), "10.8.0.10");
         assert_eq!(params.bind_interface.as_deref().unwrap(), "tun0");
         assert_eq!(params.port.unwrap(), 2222);
+        assert_eq!(
+            params.identity_file.as_deref().unwrap(),
+            vec![
+                Path::new("/home/root/.ssh/pippo.key"),
+                Path::new("/home/root/.ssh/pluto.key")
+            ]
+        );
         assert_eq!(params.user.as_deref().unwrap(), "omar");
         // Query tostapane
         let params = config.query("tostapane");
@@ -984,6 +1015,18 @@ mod test {
     }
 
     #[test]
+    fn should_parse_path_and_resolve_tilde() {
+        let mut expected = dirs::home_dir().unwrap();
+        expected.push(".ssh/id_dsa");
+        assert_eq!(
+            SshConfigParser::parse_path(vec![String::from("~/.ssh/id_dsa")])
+                .ok()
+                .unwrap(),
+            expected
+        );
+    }
+
+    #[test]
     fn should_fail_parsing_path() {
         assert!(SshConfigParser::parse_path(vec![]).is_err());
     }
@@ -1068,6 +1111,7 @@ Host 192.168.*.*    172.26.*.*      !192.168.1.30
     BindAddress     10.8.0.10
     BindInterface   tun0
     Ciphers     +coi-piedi,cazdecan,triestin-stretto
+    IdentityFile    /home/root/.ssh/pippo.key /home/root/.ssh/pluto.key
     Macs     spyro,deoxys
     Port 2222
     PubkeyAcceptedAlgorithms    -omar-crypt

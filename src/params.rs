@@ -52,6 +52,10 @@ pub struct HostParams {
     pub host_key_algorithms: Option<Vec<String>>,
     /// Specifies the real host name to log into
     pub host_name: Option<String>,
+    /// Specifies the path of the identity file to be used when authenticating.
+    /// More than one file can be specified.
+    /// If more than one file is specified, they will be read in order
+    pub identity_file: Option<Vec<PathBuf>>,
     /// Specifies the available KEX (Key Exchange) algorithms
     pub kex_algorithms: Option<Vec<String>>,
     /// Specifies the MAC (message authentication code) algorithms in order of preference
@@ -105,6 +109,9 @@ impl HostParams {
         if let Some(host_name) = b.host_name.clone() {
             self.host_name = Some(host_name);
         }
+        if let Some(identity_file) = b.identity_file.clone() {
+            self.identity_file = Some(identity_file);
+        }
         if let Some(kex_algorithms) = b.kex_algorithms.clone() {
             self.kex_algorithms = Some(kex_algorithms);
         }
@@ -155,6 +162,7 @@ mod test {
         assert!(params.connect_timeout.is_none());
         assert!(params.host_key_algorithms.is_none());
         assert!(params.host_name.is_none());
+        assert!(params.identity_file.is_none());
         assert!(params.kex_algorithms.is_none());
         assert!(params.mac.is_none());
         assert!(params.port.is_none());
@@ -179,6 +187,7 @@ mod test {
         b.connection_attempts = Some(3);
         b.host_key_algorithms = Some(vec![]);
         b.host_name = Some(String::from("192.168.1.2"));
+        b.identity_file = Some(vec![PathBuf::default()]);
         b.kex_algorithms = Some(vec![]);
         b.mac = Some(vec![]);
         b.port = Some(22);
@@ -198,6 +207,7 @@ mod test {
         assert!(params.connect_timeout.is_some());
         assert!(params.host_key_algorithms.is_some());
         assert!(params.host_name.is_some());
+        assert!(params.identity_file.is_some());
         assert!(params.kex_algorithms.is_some());
         assert!(params.mac.is_some());
         assert!(params.port.is_some());
