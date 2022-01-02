@@ -365,6 +365,9 @@ impl SshConfigParser {
 
     /// Parse a list of paths
     fn parse_path_list(args: Vec<String>) -> SshParserResult<Vec<PathBuf>> {
+        if args.is_empty() {
+            return Err(SshParserError::MissingArgument);
+        }
         args.iter()
             .map(|x| Self::parse_path_arg(x.as_str()))
             .collect()
@@ -1024,6 +1027,24 @@ mod test {
                 .unwrap(),
             expected
         );
+    }
+
+    #[test]
+    fn should_parse_path_list() {
+        assert_eq!(
+            SshConfigParser::parse_path_list(vec![
+                String::from("/tmp/a.txt"),
+                String::from("/tmp/b.txt")
+            ])
+            .ok()
+            .unwrap(),
+            vec![PathBuf::from("/tmp/a.txt"), PathBuf::from("/tmp/b.txt")]
+        );
+    }
+
+    #[test]
+    fn should_fail_parse_path_list() {
+        assert!(SshConfigParser::parse_path_list(vec![]).is_err());
     }
 
     #[test]
