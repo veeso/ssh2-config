@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">Developed by <a href="https://veeso.github.io/" target="_blank">@veeso</a></p>
-<p align="center">Current version: 0.1.1 (02/01/2022)</p>
+<p align="center">Current version: 0.1.2 (11/01/2022)</p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"
@@ -102,6 +102,7 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 - **RemoteForward**: you can use this method to implement port forwarding with `session.channel_forward_listen()`
 - **ServerAliveInterval**: you can use this method to implement keep alive message interval
 - **TcpKeepAlive**: you can use this method to tell whether to send keep alive message
+- **UseKeychain**: (macos only) used to tell whether to use keychain to decrypt ssh keys
 - **User**: you can use this method to resolve the user to use to log in as
 
 ### Missing features

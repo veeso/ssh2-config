@@ -85,6 +85,14 @@ impl SshConfigParser {
             // tokenize
             let (field, args) = match Self::tokenize(&line) {
                 Ok((field, args)) => (field, args),
+                Err(SshParserError::UnknownField(field)) => {
+                    // Check if is whitelisted
+                    if current_host.params.ignored(&field) {
+                        continue;
+                    } else {
+                        return Err(SshParserError::UnknownField(field));
+                    }
+                }
                 Err(err) => return Err(err),
             };
             // If field is block, init a new block
@@ -158,6 +166,9 @@ impl SshConfigParser {
             Field::IdentityFile => {
                 params.identity_file = Some(Self::parse_path_list(args)?);
             }
+            Field::IgnoreUnknown => {
+                params.ignore_unknown = Some(Self::parse_comma_separated_list(args)?);
+            }
             Field::KexAlgorithms => {
                 let algos = Self::parse_comma_separated_list(args)?;
                 if params.kex_algorithms.is_none() {
@@ -197,6 +208,10 @@ impl SshConfigParser {
             Field::TcpKeepAlive => {
                 params.tcp_keep_alive = Some(Self::parse_boolean(args)?);
             }
+            #[cfg(target_os = "macos")]
+            Field::UseKeychain => {
+                params.use_keychain = Some(Self::parse_boolean(args)?);
+            }
             Field::User => {
                 params.user = Some(Self::parse_string(args)?);
             }
@@ -233,7 +248,6 @@ impl SshConfigParser {
             | Field::HostKeyAlias
             | Field::IdentitiesOnly
             | Field::IdentityAgent
-            | Field::IgnoreUnknown
             | Field::Include
             | Field::IPQoS
             | Field::KbdInteractiveAuthentication
@@ -445,6 +459,10 @@ mod test {
         let config = SshConfig::default().parse(&mut reader).unwrap();
         // Query
         let params = config.default_params();
+        assert_eq!(
+            params.ignore_unknown.as_deref().unwrap(),
+            &["Pippo", "Pluto"]
+        );
         assert_eq!(params.compression.unwrap(), true);
         assert_eq!(params.connection_attempts.unwrap(), 10);
         assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
@@ -682,6 +700,18 @@ mod test {
         )
         .is_ok());
         assert_eq!(params.host_name.as_deref().unwrap(), "192.168.1.1");
+    }
+
+    #[test]
+    fn should_update_host_ignore_unknown() {
+        let mut params = HostParams::default();
+        assert!(SshConfigParser::update_host(
+            Field::IgnoreUnknown,
+            vec![String::from("a,b,c")],
+            &mut params
+        )
+        .is_ok());
+        assert_eq!(params.ignore_unknown.as_deref().unwrap(), &["a", "b", "c"]);
     }
 
     #[test]
@@ -1109,6 +1139,8 @@ mod test {
 
         # I put a comment here just to annoy
 
+IgnoreUnknown Pippo,Pluto
+
 Compression yes
 ConnectionAttempts          10
 ConnectTimeout 60
@@ -1142,6 +1174,8 @@ Host tostapane
     HostName    192.168.24.32
     RemoteForward   88
     Compression no
+    Pippo yes
+    Pluto 56
 
 Host    192.168.1.30
     User    nutellaro

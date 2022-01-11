@@ -45,6 +45,7 @@ pub enum Field {
     HostKeyAlgorithms,
     HostName,
     IdentityFile,
+    IgnoreUnknown,
     KexAlgorithms,
     Mac,
     Port,
@@ -53,6 +54,8 @@ pub enum Field {
     RemoteForward,
     ServerAliveInterval,
     TcpKeepAlive,
+    #[cfg(target_os = "macos")]
+    UseKeychain,
     User,
     // -- not implemented
     AddKeysToAgent,
@@ -87,7 +90,6 @@ pub enum Field {
     HostKeyAlias,
     IdentitiesOnly,
     IdentityAgent,
-    IgnoreUnknown,
     Include,
     IPQoS,
     KbdInteractiveAuthentication,
@@ -143,6 +145,7 @@ impl FromStr for Field {
             "hostkeyalgorithms" => Ok(Self::HostKeyAlgorithms),
             "hostname" => Ok(Self::HostName),
             "identityfile" => Ok(Self::IdentityFile),
+            "ignoreunknown" => Ok(Self::IgnoreUnknown),
             "kexalgorithms" => Ok(Self::KexAlgorithms),
             "macs" => Ok(Self::Mac),
             "port" => Ok(Self::Port),
@@ -151,6 +154,8 @@ impl FromStr for Field {
             "remoteforward" => Ok(Self::RemoteForward),
             "serveraliveinterval" => Ok(Self::ServerAliveInterval),
             "tcpkeepalive" => Ok(Self::TcpKeepAlive),
+            #[cfg(target_os = "macos")]
+            "usekeychain" => Ok(Self::UseKeychain),
             "user" => Ok(Self::User),
             // -- not implemented fields
             "addkeystoagent" => Ok(Self::AddKeysToAgent),
@@ -185,7 +190,6 @@ impl FromStr for Field {
             "hostkeyalias" => Ok(Self::HostKeyAlias),
             "identitiesonly" => Ok(Self::IdentitiesOnly),
             "identityagent" => Ok(Self::IdentityAgent),
-            "ignoreunknown" => Ok(Self::IgnoreUnknown),
             "include" => Ok(Self::Include),
             "ipqos" => Ok(Self::IPQoS),
             "kbdinteractiveauthentication" => Ok(Self::KbdInteractiveAuthentication),
@@ -272,6 +276,10 @@ mod test {
             Field::from_str("IdentityFile").ok().unwrap(),
             Field::IdentityFile
         );
+        assert_eq!(
+            Field::from_str("IgnoreUnknown").ok().unwrap(),
+            Field::IgnoreUnknown
+        );
         assert_eq!(Field::from_str("Macs").ok().unwrap(), Field::Mac);
         assert_eq!(
             Field::from_str("PubkeyAcceptedAlgorithms").ok().unwrap(),
@@ -289,6 +297,12 @@ mod test {
             Field::from_str("TcpKeepAlive").ok().unwrap(),
             Field::TcpKeepAlive
         );
+        #[cfg(target_os = "macos")]
+        assert_eq!(
+            Field::from_str("UseKeychain").ok().unwrap(),
+            Field::UseKeychain
+        );
+        assert_eq!(Field::from_str("User").ok().unwrap(), Field::User);
         assert_eq!(
             Field::from_str("AddKeysToAgent").ok().unwrap(),
             Field::AddKeysToAgent
@@ -417,10 +431,6 @@ mod test {
         assert_eq!(
             Field::from_str("IdentityAgent").ok().unwrap(),
             Field::IdentityAgent
-        );
-        assert_eq!(
-            Field::from_str("IgnoreUnknown").ok().unwrap(),
-            Field::IgnoreUnknown
         );
         assert_eq!(Field::from_str("Include").ok().unwrap(), Field::Include);
         assert_eq!(Field::from_str("IPQoS").ok().unwrap(), Field::IPQoS);

@@ -56,6 +56,8 @@ pub struct HostParams {
     /// More than one file can be specified.
     /// If more than one file is specified, they will be read in order
     pub identity_file: Option<Vec<PathBuf>>,
+    /// Specifies a pattern-list of unknown options to be ignored if they are encountered in configuration parsing
+    pub ignore_unknown: Option<Vec<String>>,
     /// Specifies the available KEX (Key Exchange) algorithms
     pub kex_algorithms: Option<Vec<String>>,
     /// Specifies the MAC (message authentication code) algorithms in order of preference
@@ -72,11 +74,22 @@ pub struct HostParams {
     pub server_alive_interval: Option<Duration>,
     /// Specifies whether to send TCP keepalives to the other side
     pub tcp_keep_alive: Option<bool>,
+    #[cfg(target_os = "macos")]
+    /// specifies whether the system should search for passphrases in the user's keychain when attempting to use a particular key
+    pub use_keychain: Option<bool>,
     /// Specifies the user to log in as.
     pub user: Option<String>,
 }
 
 impl HostParams {
+    /// Return whether `param` is in ignored list
+    pub(crate) fn ignored(&self, param: &str) -> bool {
+        self.ignore_unknown
+            .as_ref()
+            .map(|x| x.iter().any(|x| x.as_str() == param))
+            .unwrap_or(false)
+    }
+
     /// Override current params with params of `b`
     pub fn merge(&mut self, b: &Self) {
         if let Some(bind_address) = b.bind_address.clone() {
@@ -112,6 +125,9 @@ impl HostParams {
         if let Some(identity_file) = b.identity_file.clone() {
             self.identity_file = Some(identity_file);
         }
+        if let Some(ignore_unknown) = b.ignore_unknown.clone() {
+            self.ignore_unknown = Some(ignore_unknown);
+        }
         if let Some(kex_algorithms) = b.kex_algorithms.clone() {
             self.kex_algorithms = Some(kex_algorithms);
         }
@@ -135,6 +151,10 @@ impl HostParams {
         }
         if let Some(tcp_keep_alive) = b.tcp_keep_alive {
             self.tcp_keep_alive = Some(tcp_keep_alive);
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(use_keychain) = b.use_keychain {
+            self.use_keychain = Some(use_keychain);
         }
         if let Some(user) = b.user.clone() {
             self.user = Some(user);
@@ -163,6 +183,7 @@ mod test {
         assert!(params.host_key_algorithms.is_none());
         assert!(params.host_name.is_none());
         assert!(params.identity_file.is_none());
+        assert!(params.ignore_unknown.is_none());
         assert!(params.kex_algorithms.is_none());
         assert!(params.mac.is_none());
         assert!(params.port.is_none());
@@ -170,6 +191,8 @@ mod test {
         assert!(params.pubkey_authentication.is_none());
         assert!(params.remote_forward.is_none());
         assert!(params.server_alive_interval.is_none());
+        #[cfg(target_os = "macos")]
+        assert!(params.use_keychain.is_none());
         assert!(params.tcp_keep_alive.is_none());
     }
 
@@ -188,6 +211,7 @@ mod test {
         b.host_key_algorithms = Some(vec![]);
         b.host_name = Some(String::from("192.168.1.2"));
         b.identity_file = Some(vec![PathBuf::default()]);
+        b.ignore_unknown = Some(vec![]);
         b.kex_algorithms = Some(vec![]);
         b.mac = Some(vec![]);
         b.port = Some(22);
@@ -195,6 +219,10 @@ mod test {
         b.pubkey_authentication = Some(true);
         b.remote_forward = Some(32);
         b.server_alive_interval = Some(Duration::from_secs(10));
+        #[cfg(target_os = "macos")]
+        {
+            b.use_keychain = Some(true);
+        }
         b.tcp_keep_alive = Some(true);
         params.merge(&b);
         assert!(params.bind_address.is_some());
@@ -208,6 +236,7 @@ mod test {
         assert!(params.host_key_algorithms.is_some());
         assert!(params.host_name.is_some());
         assert!(params.identity_file.is_some());
+        assert!(params.ignore_unknown.is_some());
         assert!(params.kex_algorithms.is_some());
         assert!(params.mac.is_some());
         assert!(params.port.is_some());
@@ -215,6 +244,8 @@ mod test {
         assert!(params.pubkey_authentication.is_some());
         assert!(params.remote_forward.is_some());
         assert!(params.server_alive_interval.is_some());
+        #[cfg(target_os = "macos")]
+        assert!(params.use_keychain.is_some());
         assert!(params.tcp_keep_alive.is_some());
         // merge twices
         b.tcp_keep_alive = None;
