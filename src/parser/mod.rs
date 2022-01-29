@@ -238,6 +238,7 @@ impl SshConfigParser {
             | Field::ForwardAgent
             | Field::ForwardX11
             | Field::ForwardX11Timeout
+            | Field::ForwardX11Trusted
             | Field::GatewayPorts
             | Field::GlobalKnownHostsFile
             | Field::GSSAPIAuthentication

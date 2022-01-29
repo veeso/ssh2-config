@@ -1,11 +1,18 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.1.3](#013)
   - [0.1.2](#012)
   - [0.1.1](#011)
   - [0.1.0](#010)
 
 ---
+
+## 0.1.3
+
+Released on 29/01/2022
+
+- Added missing `ForwardX11Trusted` field to known fields
 
 ## 0.1.2
 

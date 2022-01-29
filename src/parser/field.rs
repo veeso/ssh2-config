@@ -80,6 +80,7 @@ pub enum Field {
     ForwardAgent,
     ForwardX11,
     ForwardX11Timeout,
+    ForwardX11Trusted,
     GatewayPorts,
     GlobalKnownHostsFile,
     GSSAPIAuthentication,
@@ -180,6 +181,7 @@ impl FromStr for Field {
             "forwardagent" => Ok(Self::ForwardAgent),
             "forwardx11" => Ok(Self::ForwardX11),
             "forwardx11timeout" => Ok(Self::ForwardX11Timeout),
+            "forwardx11trusted" => Ok(Self::ForwardX11Trusted),
             "gatewayports" => Ok(Self::GatewayPorts),
             "globalknownhostsfile" => Ok(Self::GlobalKnownHostsFile),
             "gssapiauthentication" => Ok(Self::GSSAPIAuthentication),
@@ -387,6 +389,10 @@ mod test {
         assert_eq!(
             Field::from_str("ForwardX11Timeout").ok().unwrap(),
             Field::ForwardX11Timeout
+        );
+        assert_eq!(
+            Field::from_str("ForwardX11Trusted").ok().unwrap(),
+            Field::ForwardX11Trusted,
         );
         assert_eq!(
             Field::from_str("GatewayPorts").ok().unwrap(),
