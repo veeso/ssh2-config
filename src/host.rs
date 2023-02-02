@@ -59,7 +59,7 @@ impl std::cmp::Ord for Host {
 }
 
 /// Describes a single clause to match host
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostClause {
     pub pattern: String,
     pub negated: bool,
@@ -74,6 +74,12 @@ impl HostClause {
     /// Returns whether `host` argument intersects the clause
     pub fn intersects(&self, host: &str) -> bool {
         WildMatch::new(self.pattern.as_str()).matches(host)
+    }
+}
+
+impl std::cmp::PartialOrd for HostClause {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.pattern.cmp(&other.pattern))
     }
 }
 

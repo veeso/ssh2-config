@@ -88,14 +88,9 @@ impl SshConfigParser {
             }
         }
         // sort hosts
-        Self::sort(config);
+        config.hosts.sort();
 
         Ok(())
-    }
-
-    /// Sort host clauses
-    fn sort(config: &mut SshConfig) {
-        config.hosts.sort_by(|a, b| a.cmp(b));
     }
 
     /// Update current given host with field argument
@@ -302,7 +297,7 @@ impl SshConfigParser {
 
     /// Tokenize line if possible. Returns field name and args
     fn tokenize(line: &str) -> SshParserResult<(Field, Vec<String>)> {
-        let mut tokens = line.trim().split_whitespace();
+        let mut tokens = line.split_whitespace();
         let field = match tokens.next().map(Field::from_str) {
             Some(Ok(field)) => field,
             Some(Err(field)) => return Err(SshParserError::UnknownField(field)),
