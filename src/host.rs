@@ -4,29 +4,6 @@
 
 use std::cmp::Ordering;
 
-/**
- * MIT License
- *
- * ssh2-config - Copyright (c) 2021 Christian Visintin
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
 use super::HostParams;
 
 use wildmatch::WildMatch;
@@ -57,8 +34,21 @@ impl Host {
         }
         has_matched
     }
+}
 
-    pub(crate) fn cmp(&self, other: &Self) -> Ordering {
+impl std::cmp::PartialOrd for Host {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let self_max_pattern = self.pattern.iter().max_by(|x, y| x.cmp(y));
+        let other_max_pattern = other.pattern.iter().max_by(|x, y| x.cmp(y));
+        match (self_max_pattern, other_max_pattern) {
+            (Some(_self), Some(other)) => Some(_self.cmp(other)),
+            _ => None,
+        }
+    }
+}
+
+impl std::cmp::Ord for Host {
+    fn cmp(&self, other: &Self) -> Ordering {
         let self_max_pattern = self.pattern.iter().max_by(|x, y| x.cmp(y));
         let other_max_pattern = other.pattern.iter().max_by(|x, y| x.cmp(y));
         match (self_max_pattern, other_max_pattern) {
@@ -69,7 +59,7 @@ impl Host {
 }
 
 /// Describes a single clause to match host
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
 pub struct HostClause {
     pub pattern: String,
     pub negated: bool,
@@ -85,9 +75,11 @@ impl HostClause {
     pub fn intersects(&self, host: &str) -> bool {
         WildMatch::new(self.pattern.as_str()).matches(host)
     }
+}
 
-    fn cmp(&self, b: &Self) -> Ordering {
-        self.pattern.cmp(&b.pattern)
+impl std::cmp::Ord for HostClause {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.pattern.cmp(&other.pattern)
     }
 }
 
