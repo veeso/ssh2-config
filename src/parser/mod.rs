@@ -110,7 +110,15 @@ impl SshConfigParser {
                 Self::update_host(field, args, &mut current_host.params)?;
             }
         }
+        // sort hosts
+        Self::sort(config);
+
         Ok(())
+    }
+
+    /// Sort host clauses
+    fn sort(config: &mut SshConfig) {
+        config.hosts.sort_by(|a, b| a.cmp(b));
     }
 
     /// Update current given host with field argument
@@ -572,6 +580,24 @@ mod test {
         );
         assert_eq!(params.user.as_deref().unwrap(), "nutellaro");
         assert_eq!(params.remote_forward.unwrap(), 123);
+    }
+
+    #[test]
+    fn should_parse_inversed_ssh_config() {
+        let temp = create_inverted_ssh_config();
+        let file = File::open(temp.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+        let config = SshConfig::default().parse(&mut reader).unwrap();
+
+        let home_dir = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("~"))
+            .to_string_lossy()
+            .to_string();
+
+        assert_eq!(
+            config.query("remote_host").identity_file.unwrap()[0].as_path(),
+            Path::new(format!("{home_dir}/.ssh/id_rsa_good").as_str())
+        );
     }
 
     #[test]
@@ -1183,6 +1209,26 @@ Host    192.168.1.30
     RemoteForward   123
 
 "##;
+        tmpfile.write_all(config.as_bytes()).unwrap();
+        tmpfile
+    }
+
+    fn create_inverted_ssh_config() -> NamedTempFile {
+        let mut tmpfile: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let config = r##"
+Host remote_host
+    HostName hostname.com
+    User user
+    IdentityFile ~/.ssh/id_rsa_good
+
+Host remote_*
+    IdentityFile ~/.ssh/id_mid
+
+Host *
+    AddKeysToAgent yes
+    IdentityFile ~/.ssh/id_rsa_bad
+    "##;
         tmpfile.write_all(config.as_bytes()).unwrap();
         tmpfile
     }

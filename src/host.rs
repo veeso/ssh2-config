@@ -2,6 +2,8 @@
 //!
 //! Ssh host type
 
+use std::cmp::Ordering;
+
 /**
  * MIT License
  *
@@ -33,7 +35,7 @@ use wildmatch::WildMatch;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Host {
     /// List of hosts for which params are valid. String is string pattern, bool is whether condition is negated
-    pattern: Vec<HostClause>,
+    pub pattern: Vec<HostClause>,
     pub params: HostParams,
 }
 
@@ -55,6 +57,15 @@ impl Host {
         }
         has_matched
     }
+
+    pub(crate) fn cmp(&self, other: &Self) -> Ordering {
+        let self_max_pattern = self.pattern.iter().max_by(|x, y| x.cmp(y));
+        let other_max_pattern = other.pattern.iter().max_by(|x, y| x.cmp(y));
+        match (self_max_pattern, other_max_pattern) {
+            (Some(_self), Some(other)) => _self.cmp(other),
+            _ => Ordering::Equal,
+        }
+    }
 }
 
 /// Describes a single clause to match host
@@ -73,6 +84,10 @@ impl HostClause {
     /// Returns whether `host` argument intersects the clause
     pub fn intersects(&self, host: &str) -> bool {
         WildMatch::new(self.pattern.as_str()).matches(host)
+    }
+
+    fn cmp(&self, b: &Self) -> Ordering {
+        self.pattern.cmp(&b.pattern)
     }
 }
 
