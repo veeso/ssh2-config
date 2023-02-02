@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">Developed by <a href="https://veeso.github.io/" target="_blank">@veeso</a></p>
-<p align="center">Current version: 0.1.3 (29/01/2022)</p>
+<p align="center">Current version: 0.1.4 (02/02/2023)</p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"
@@ -118,7 +118,7 @@ First of all, add ssh2-config to your dependencies
 
 ```toml
 [dependencies]
-ssh2-config = "^0.1.1"
+ssh2-config = "^0.1.4"
 ```
 
 then parse the configuration

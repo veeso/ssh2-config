@@ -1,12 +1,19 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.1.4](#014)
   - [0.1.3](#013)
   - [0.1.2](#012)
   - [0.1.1](#011)
   - [0.1.0](#010)
 
 ---
+
+## 0.1.4
+
+Released on 02/02/2023
+
+- Fixed [issue 2](https://github.com/veeso/ssh2-config/issues/2) hosts not being sorted by priority in host query
 
 ## 0.1.3
 
