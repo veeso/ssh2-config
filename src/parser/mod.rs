@@ -2,29 +2,6 @@
 //!
 //! Ssh config parser
 
-/**
- * MIT License
- *
- * ssh2-config - Copyright (c) 2021 Christian Visintin
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
 use super::{Host, HostClause, HostParams, SshConfig};
 
 use std::{
@@ -110,6 +87,9 @@ impl SshConfigParser {
                 Self::update_host(field, args, &mut current_host.params)?;
             }
         }
+        // sort hosts
+        config.hosts.sort();
+
         Ok(())
     }
 
@@ -317,7 +297,7 @@ impl SshConfigParser {
 
     /// Tokenize line if possible. Returns field name and args
     fn tokenize(line: &str) -> SshParserResult<(Field, Vec<String>)> {
-        let mut tokens = line.trim().split_whitespace();
+        let mut tokens = line.split_whitespace();
         let field = match tokens.next().map(Field::from_str) {
             Some(Ok(field)) => field,
             Some(Err(field)) => return Err(SshParserError::UnknownField(field)),
@@ -572,6 +552,24 @@ mod test {
         );
         assert_eq!(params.user.as_deref().unwrap(), "nutellaro");
         assert_eq!(params.remote_forward.unwrap(), 123);
+    }
+
+    #[test]
+    fn should_parse_inversed_ssh_config() {
+        let temp = create_inverted_ssh_config();
+        let file = File::open(temp.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+        let config = SshConfig::default().parse(&mut reader).unwrap();
+
+        let home_dir = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("~"))
+            .to_string_lossy()
+            .to_string();
+
+        assert_eq!(
+            config.query("remote_host").identity_file.unwrap()[0].as_path(),
+            Path::new(format!("{home_dir}/.ssh/id_rsa_good").as_str())
+        );
     }
 
     #[test]
@@ -1183,6 +1181,26 @@ Host    192.168.1.30
     RemoteForward   123
 
 "##;
+        tmpfile.write_all(config.as_bytes()).unwrap();
+        tmpfile
+    }
+
+    fn create_inverted_ssh_config() -> NamedTempFile {
+        let mut tmpfile: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let config = r##"
+Host remote_host
+    HostName hostname.com
+    User user
+    IdentityFile ~/.ssh/id_rsa_good
+
+Host remote_*
+    IdentityFile ~/.ssh/id_mid
+
+Host *
+    AddKeysToAgent yes
+    IdentityFile ~/.ssh/id_rsa_bad
+    "##;
         tmpfile.write_all(config.as_bytes()).unwrap();
         tmpfile
     }
