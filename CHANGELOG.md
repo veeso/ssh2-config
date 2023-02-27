@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.1.5](#015)
   - [0.1.4](#014)
   - [0.1.3](#013)
   - [0.1.2](#012)
@@ -8,6 +9,12 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.1.5
+
+Released on 27/02/2023
+
+- Fixed comments not being properly stripped
 
 ## 0.1.4
 

@@ -53,10 +53,9 @@ impl SshConfigParser {
             let line = match lines.next() {
                 None => break,
                 Some(Err(err)) => return Err(SshParserError::Io(err)),
-                Some(Ok(line)) => line.trim().to_string(),
+                Some(Ok(line)) => Self::strip_comments(line.trim()),
             };
-            // skip comments
-            if line.starts_with('#') || line.is_empty() {
+            if line.is_empty() {
                 continue;
             }
             // tokenize
@@ -91,6 +90,15 @@ impl SshConfigParser {
         config.hosts.sort();
 
         Ok(())
+    }
+
+    /// Strip comments from line
+    fn strip_comments(s: &str) -> String {
+        if let Some(pos) = s.find('#') {
+            s[..pos].to_string()
+        } else {
+            s.to_string()
+        }
     }
 
     /// Update current given host with field argument
@@ -570,6 +578,20 @@ mod test {
             config.query("remote_host").identity_file.unwrap()[0].as_path(),
             Path::new(format!("{home_dir}/.ssh/id_rsa_good").as_str())
         );
+    }
+
+    #[test]
+    fn should_parse_configuration_with_hosts() {
+        let temp = create_ssh_config_with_comments();
+
+        let file = File::open(temp.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+        let config = SshConfig::default().parse(&mut reader).unwrap();
+
+        let hostname = config.query("cross-platform").host_name.unwrap();
+        assert_eq!(&hostname, "hostname.com");
+
+        assert!(config.query("this").host_name.is_none());
     }
 
     #[test]
@@ -1128,6 +1150,18 @@ mod test {
         assert!(SshConfigParser::parse_unsigned(vec![]).is_err());
     }
 
+    #[test]
+    fn should_strip_comments() {
+        assert_eq!(
+            SshConfigParser::strip_comments("host my_host # this is my fav host").as_str(),
+            "host my_host "
+        );
+        assert_eq!(
+            SshConfigParser::strip_comments("# this is a comment").as_str(),
+            ""
+        );
+    }
+
     fn create_ssh_config() -> NamedTempFile {
         let mut tmpfile: tempfile::NamedTempFile =
             tempfile::NamedTempFile::new().expect("Failed to create tempfile");
@@ -1196,6 +1230,23 @@ Host remote_host
 
 Host remote_*
     IdentityFile ~/.ssh/id_mid
+
+Host *
+    AddKeysToAgent yes
+    IdentityFile ~/.ssh/id_rsa_bad
+    "##;
+        tmpfile.write_all(config.as_bytes()).unwrap();
+        tmpfile
+    }
+
+    fn create_ssh_config_with_comments() -> NamedTempFile {
+        let mut tmpfile: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let config = r##"
+Host cross-platform # this is my fav host
+    HostName hostname.com
+    User user
+    IdentityFile ~/.ssh/id_rsa_good
 
 Host *
     AddKeysToAgent yes
