@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.1.6](#016)
   - [0.1.5](#015)
   - [0.1.4](#014)
   - [0.1.3](#013)
@@ -9,6 +10,14 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.1.6
+
+Released on 03/03/2023
+
+- Added legacy field support
+  - HostbasedKeyTypes
+  - PubkeyAcceptedKeyTypes
 
 ## 0.1.5
 

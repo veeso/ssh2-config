@@ -235,6 +235,7 @@ impl SshConfigParser {
             | Field::HostbasedAcceptedAlgorithms
             | Field::HostbasedAuthentication
             | Field::HostKeyAlias
+            | Field::HostbasedKeyTypes
             | Field::IdentitiesOnly
             | Field::IdentityAgent
             | Field::Include
@@ -256,6 +257,7 @@ impl SshConfigParser {
             | Field::ProxyCommand
             | Field::ProxyJump
             | Field::ProxyUseFdpass
+            | Field::PubkeyAcceptedKeyTypes
             | Field::RekeyLimit
             | Field::RequestTTY
             | Field::RevokedHostKeys

@@ -65,6 +65,7 @@ pub enum Field {
     HashKnownHosts,
     HostbasedAcceptedAlgorithms,
     HostbasedAuthentication,
+    HostbasedKeyTypes,
     HostKeyAlias,
     IdentitiesOnly,
     IdentityAgent,
@@ -87,6 +88,7 @@ pub enum Field {
     ProxyCommand,
     ProxyJump,
     ProxyUseFdpass,
+    PubkeyAcceptedKeyTypes,
     RekeyLimit,
     RequestTTY,
     RevokedHostKeys,
@@ -167,6 +169,7 @@ impl FromStr for Field {
             "hostbasedacceptedalgorithms" => Ok(Self::HostbasedAcceptedAlgorithms),
             "hostbasedauthentication" => Ok(Self::HostbasedAuthentication),
             "hostkeyalias" => Ok(Self::HostKeyAlias),
+            "hostbasedkeytypes" => Ok(Self::HostbasedKeyTypes),
             "identitiesonly" => Ok(Self::IdentitiesOnly),
             "identityagent" => Ok(Self::IdentityAgent),
             "include" => Ok(Self::Include),
@@ -188,6 +191,7 @@ impl FromStr for Field {
             "proxycommand" => Ok(Self::ProxyCommand),
             "proxyjump" => Ok(Self::ProxyJump),
             "proxyusefdpass" => Ok(Self::ProxyUseFdpass),
+            "pubkeyacceptedkeytypes" => Ok(Self::PubkeyAcceptedKeyTypes),
             "rekeylimit" => Ok(Self::RekeyLimit),
             "requesttty" => Ok(Self::RequestTTY),
             "revokedhostkeys" => Ok(Self::RevokedHostKeys),
@@ -408,6 +412,10 @@ mod test {
             Field::HostKeyAlias
         );
         assert_eq!(
+            Field::from_str("HostbasedKeyTypes").ok().unwrap(),
+            Field::HostbasedKeyTypes
+        );
+        assert_eq!(
             Field::from_str("IdentitiesOnly").ok().unwrap(),
             Field::IdentitiesOnly
         );
@@ -483,6 +491,10 @@ mod test {
         assert_eq!(
             Field::from_str("ProxyUseFdpass").ok().unwrap(),
             Field::ProxyUseFdpass
+        );
+        assert_eq!(
+            Field::from_str("PubkeyAcceptedKeyTypes").ok().unwrap(),
+            Field::PubkeyAcceptedKeyTypes
         );
         assert_eq!(
             Field::from_str("RekeyLimit").ok().unwrap(),
