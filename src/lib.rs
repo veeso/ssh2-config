@@ -21,7 +21,7 @@
 //! First of you need to add **ssh2-config** to your project dependencies:
 //!
 //! ```toml
-//! ssh2-config = "^0.1.0"
+//! ssh2-config = "^0.2.0"
 //! ```
 //!
 //! ## Example
@@ -31,7 +31,7 @@
 //! ```rust
 //!
 //! use ssh2::Session;
-//! use ssh2_config::{HostParams, SshConfig};
+//! use ssh2_config::{HostParams, ParseRule, SshConfig};
 //! use std::fs::File;
 //! use std::io::BufReader;
 //! use std::path::Path;
@@ -41,7 +41,7 @@
 //!         .expect("Could not open configuration file")
 //! );
 //!
-//! let config = SshConfig::default().parse(&mut reader).expect("Failed to parse configuration");
+//! let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
 //!
 //! let default_params = config.default_params();
 //! // Query parameters for your host
@@ -53,7 +53,9 @@
 
 #![doc(html_playground_url = "https://play.rust-lang.org")]
 
-use std::{io::BufRead, path::PathBuf, time::Duration};
+use std::io::BufRead;
+use std::path::PathBuf;
+use std::time::Duration;
 // -- modules
 mod host;
 mod params;
@@ -62,7 +64,7 @@ mod parser;
 // -- export
 pub use host::{Host, HostClause};
 pub use params::HostParams;
-pub use parser::{SshParserError, SshParserResult};
+pub use parser::{ParseRule, SshParserError, SshParserResult};
 
 /// Describes the ssh configuration.
 /// Configuration is describes in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
@@ -104,17 +106,17 @@ impl SshConfig {
     }
 
     /// Parse stream and return parsed configuration or parser error
-    pub fn parse(mut self, reader: &mut impl BufRead) -> SshParserResult<Self> {
-        parser::SshConfigParser::parse(&mut self, reader).map(|_| self)
+    pub fn parse(mut self, reader: &mut impl BufRead, rules: ParseRule) -> SshParserResult<Self> {
+        parser::SshConfigParser::parse(&mut self, reader, rules).map(|_| self)
     }
 }
 
 #[cfg(test)]
 mod test {
 
-    use super::*;
-
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     #[test]
     fn should_init_ssh_config() {

@@ -2,15 +2,15 @@
 //!
 //! Ssh config parser
 
-use super::{Host, HostClause, HostParams, SshConfig};
+use std::io::{BufRead, Error as IoError};
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::time::Duration;
 
-use std::{
-    io::{BufRead, Error as IoError},
-    path::PathBuf,
-    str::FromStr,
-    time::Duration,
-};
+use bitflags::bitflags;
 use thiserror::Error;
+
+use super::{Host, HostClause, HostParams, SshConfig};
 
 // modules
 mod field;
@@ -37,6 +37,17 @@ pub enum SshParserError {
     Io(IoError),
 }
 
+bitflags! {
+    /// The parsing mode
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    pub struct ParseRule: u8 {
+        /// Don't allow any invalid field or value
+        const STRICT = 0b00000000;
+        /// Allow unknown field
+        const ALLOW_UNKNOWN_FIELDS = 0b00000001;
+    }
+}
+
 // -- parser
 
 /// Ssh config parser
@@ -44,7 +55,11 @@ pub struct SshConfigParser;
 
 impl SshConfigParser {
     /// Parse reader lines and apply parameters to configuration
-    pub fn parse(config: &mut SshConfig, reader: &mut impl BufRead) -> SshParserResult<()> {
+    pub fn parse(
+        config: &mut SshConfig,
+        reader: &mut impl BufRead,
+        rules: ParseRule,
+    ) -> SshParserResult<()> {
         // Current host pointer
         let mut current_host = config.hosts.last_mut().unwrap();
         let mut lines = reader.lines();
@@ -61,13 +76,16 @@ impl SshConfigParser {
             // tokenize
             let (field, args) = match Self::tokenize(&line) {
                 Ok((field, args)) => (field, args),
+                Err(SshParserError::UnknownField(_))
+                    if rules.intersects(ParseRule::ALLOW_UNKNOWN_FIELDS) =>
+                {
+                    continue
+                }
+                Err(SshParserError::UnknownField(field)) if current_host.params.ignored(&field) => {
+                    continue
+                }
                 Err(SshParserError::UnknownField(field)) => {
-                    // Check if is whitelisted
-                    if current_host.params.ignored(&field) {
-                        continue;
-                    } else {
-                        return Err(SshParserError::UnknownField(field));
-                    }
+                    return Err(SshParserError::UnknownField(field))
                 }
                 Err(err) => return Err(err),
             };
@@ -433,21 +451,23 @@ impl SshConfigParser {
 #[cfg(test)]
 mod test {
 
-    use super::*;
+    use std::fs::File;
+    use std::io::{BufReader, Write};
+    use std::path::Path;
 
     use pretty_assertions::assert_eq;
-    use std::fs::File;
-    use std::io::BufReader;
-    use std::io::Write;
-    use std::path::Path;
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     #[test]
     fn should_parse_configuration() {
         let temp = create_ssh_config();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
-        let config = SshConfig::default().parse(&mut reader).unwrap();
+        let config = SshConfig::default()
+            .parse(&mut reader, ParseRule::STRICT)
+            .unwrap();
         // Query
         let params = config.default_params();
         assert_eq!(
@@ -565,11 +585,33 @@ mod test {
     }
 
     #[test]
+    fn should_allow_unknown_field() {
+        let temp = create_ssh_config_with_unknown_fields();
+        let file = File::open(temp.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+        assert!(SshConfig::default()
+            .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
+            .is_ok());
+    }
+
+    #[test]
+    fn should_not_allow_unknown_field() {
+        let temp = create_ssh_config_with_unknown_fields();
+        let file = File::open(temp.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+        assert!(SshConfig::default()
+            .parse(&mut reader, ParseRule::STRICT)
+            .is_err());
+    }
+
+    #[test]
     fn should_parse_inversed_ssh_config() {
         let temp = create_inverted_ssh_config();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
-        let config = SshConfig::default().parse(&mut reader).unwrap();
+        let config = SshConfig::default()
+            .parse(&mut reader, ParseRule::STRICT)
+            .unwrap();
 
         let home_dir = dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("~"))
@@ -588,7 +630,9 @@ mod test {
 
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
-        let config = SshConfig::default().parse(&mut reader).unwrap();
+        let config = SshConfig::default()
+            .parse(&mut reader, ParseRule::STRICT)
+            .unwrap();
 
         let hostname = config.query("cross-platform").host_name.unwrap();
         assert_eq!(&hostname, "hostname.com");
@@ -1249,6 +1293,24 @@ Host cross-platform # this is my fav host
     HostName hostname.com
     User user
     IdentityFile ~/.ssh/id_rsa_good
+
+Host *
+    AddKeysToAgent yes
+    IdentityFile ~/.ssh/id_rsa_bad
+    "##;
+        tmpfile.write_all(config.as_bytes()).unwrap();
+        tmpfile
+    }
+
+    fn create_ssh_config_with_unknown_fields() -> NamedTempFile {
+        let mut tmpfile: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let config = r##"
+Host cross-platform # this is my fav host
+    HostName hostname.com
+    User user
+    IdentityFile ~/.ssh/id_rsa_good
+    Piropero yes
 
 Host *
     AddKeysToAgent yes

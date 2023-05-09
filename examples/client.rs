@@ -2,9 +2,6 @@
 //!
 //! Ssh2-config implementation with a ssh2 client
 
-use dirs::home_dir;
-use ssh2::{MethodType, Session};
-use ssh2_config::{HostParams, SshConfig};
 use std::env::args;
 use std::fs::File;
 use std::io::BufReader;
@@ -12,6 +9,10 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::time::Duration;
+
+use dirs::home_dir;
+use ssh2::{MethodType, Session};
+use ssh2_config::{HostParams, ParseRule, SshConfig};
 
 fn main() {
     // get args
@@ -47,7 +48,7 @@ fn read_config(p: &Path) -> SshConfig {
         Ok(f) => BufReader::new(f),
         Err(err) => panic!("Could not open file '{}': {}", p.display(), err),
     };
-    match SshConfig::default().parse(&mut reader) {
+    match SshConfig::default().parse(&mut reader, ParseRule::STRICT) {
         Ok(config) => config,
         Err(err) => panic!("Failed to parse configuration: {}", err),
     }

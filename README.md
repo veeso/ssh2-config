@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">Developed by <a href="https://veeso.github.io/" target="_blank">@veeso</a></p>
-<p align="center">Current version: 0.1.6 (03/03/2023)</p>
+<p align="center">Current version: 0.2.0 (03/03/2023)</p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"
@@ -118,18 +118,18 @@ First of all, add ssh2-config to your dependencies
 
 ```toml
 [dependencies]
-ssh2-config = "^0.1.5"
+ssh2-config = "^0.2"
 ```
 
 then parse the configuration
 
 ```rust
-use ssh2_config::{SshConfig};
+use ssh2_config::{ParseRule, SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 
 let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-let config = SshConfig::default().parse(&mut reader).expect("Failed to parse configuration");
+let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
 
 // Query attributes for a certain host
 let params = config.query("192.168.1.2");

@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.2.0](#020)
   - [0.1.6](#016)
   - [0.1.5](#015)
   - [0.1.4](#014)
@@ -10,6 +11,12 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.2.0
+
+Released on 09/05/2023
+
+- Added `ParseRule` field to `parse()` method to specify some rules for parsing. ❗ To keep the behaviour as-is use `ParseRule::STRICT`
 
 ## 0.1.6
 

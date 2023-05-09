@@ -4,9 +4,9 @@
 
 use std::cmp::Ordering;
 
-use super::HostParams;
-
 use wildmatch::WildMatch;
+
+use super::HostParams;
 
 /// Describes the rules to be used for a certain host
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,9 +92,9 @@ impl std::cmp::Ord for HostClause {
 #[cfg(test)]
 mod test {
 
-    use super::*;
-
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     #[test]
     fn should_build_host_clause() {
