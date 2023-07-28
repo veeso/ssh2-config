@@ -109,6 +109,10 @@ impl SshConfig {
     pub fn parse(mut self, reader: &mut impl BufRead, rules: ParseRule) -> SshParserResult<Self> {
         parser::SshConfigParser::parse(&mut self, reader, rules).map(|_| self)
     }
+
+    pub fn get_hosts(&self) -> &Vec<Host> {
+        &self.hosts
+    }
 }
 
 #[cfg(test)]
