@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.2.1](#021)
   - [0.2.0](#020)
   - [0.1.6](#016)
   - [0.1.5](#015)
@@ -11,6 +12,13 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.2.1
+
+Released on 28/07/2023
+
+- Added `parse_default_file` to parse directly the default ssh config file at `$HOME/.ssh/config`
+- Added `get_hosts` to retrieve current configuration's hosts
 
 ## 0.2.0
 
