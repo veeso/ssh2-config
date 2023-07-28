@@ -431,8 +431,8 @@ impl SshConfigParser {
 
     /// Parse string argument
     fn parse_string(args: Vec<String>) -> SshParserResult<String> {
-        if let Some(s) = args.get(0) {
-            Ok(s.to_string())
+        if let Some(s) = args.into_iter().next() {
+            Ok(s)
         } else {
             Err(SshParserError::MissingArgument)
         }
