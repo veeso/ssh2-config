@@ -53,7 +53,8 @@
 
 #![doc(html_playground_url = "https://play.rust-lang.org")]
 
-use std::io::BufRead;
+use std::fs::File;
+use std::io::{BufRead, self, BufReader};
 use std::path::PathBuf;
 use std::time::Duration;
 // -- modules
@@ -109,6 +110,19 @@ impl SshConfig {
     pub fn parse(mut self, reader: &mut impl BufRead, rules: ParseRule) -> SshParserResult<Self> {
         parser::SshConfigParser::parse(&mut self, reader, rules).map(|_| self)
     }
+
+    /// Parse ~/.ssh/config file and return parsed configuration or parser error
+    pub fn parse_default_file(rules: ParseRule) -> SshParserResult<Self> {
+        let ssh_folder = dirs::home_dir()
+            .ok_or_else(|| SshParserError::Io(io::Error::new(io::ErrorKind::NotFound, "Home folder not found")))?
+            .join(".ssh");
+
+        let mut reader = BufReader::new(File::open(ssh_folder.join("config"))
+            .map_err(SshParserError::Io)?);
+
+        Self::default().parse(&mut reader, rules)
+    }
+
 
     pub fn get_hosts(&self) -> &Vec<Host> {
         &self.hosts
