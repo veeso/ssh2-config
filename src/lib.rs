@@ -53,7 +53,8 @@
 
 #![doc(html_playground_url = "https://play.rust-lang.org")]
 
-use std::io::BufRead;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
 use std::path::PathBuf;
 use std::time::Duration;
 // -- modules
@@ -110,6 +111,24 @@ impl SshConfig {
         parser::SshConfigParser::parse(&mut self, reader, rules).map(|_| self)
     }
 
+    #[cfg(target_family = "unix")]
+    /// Parse ~/.ssh/config file and return parsed configuration or parser error
+    pub fn parse_default_file(rules: ParseRule) -> SshParserResult<Self> {
+        let ssh_folder = dirs::home_dir()
+            .ok_or_else(|| {
+                SshParserError::Io(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Home folder not found",
+                ))
+            })?
+            .join(".ssh");
+
+        let mut reader =
+            BufReader::new(File::open(ssh_folder.join("config")).map_err(SshParserError::Io)?);
+
+        Self::default().parse(&mut reader, rules)
+    }
+
     pub fn get_hosts(&self) -> &Vec<Host> {
         &self.hosts
     }
@@ -128,6 +147,28 @@ mod test {
         assert_eq!(config.hosts.len(), 1);
         assert_eq!(config.default_params(), HostParams::default());
         assert_eq!(config.query("192.168.1.2"), HostParams::default());
+    }
+
+    #[test]
+    #[cfg(target_family = "unix")]
+    fn should_parse_default_config() {
+        assert!(SshConfig::parse_default_file(ParseRule::ALLOW_UNKNOWN_FIELDS).is_ok());
+    }
+
+    #[test]
+    fn should_parse_config() {
+        use std::fs::File;
+        use std::io::BufReader;
+        use std::path::Path;
+
+        let mut reader = BufReader::new(
+            File::open(Path::new("./assets/ssh.config"))
+                .expect("Could not open configuration file"),
+        );
+
+        assert!(SshConfig::default()
+            .parse(&mut reader, ParseRule::STRICT)
+            .is_ok());
     }
 
     #[test]

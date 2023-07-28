@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y libssh2-1-dev libssl-dev
+        run: sudo apt update && sudo apt install -y libssh2-1-dev libssl-dev && mkdir -p $HOME/.ssh && touch $HOME/.ssh/config
       - name: Setup nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
