@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.2.2](#022)
   - [0.2.1](#021)
   - [0.2.0](#020)
   - [0.1.6](#016)
@@ -12,6 +13,12 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.2.2
+
+Released on 31/07/2023
+
+- Exposed `ignored_fields` as `Map<String, Vec<String>>` (KeyName => Args) for `HostParams`
 
 ## 0.2.1
 
