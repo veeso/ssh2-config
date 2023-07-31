@@ -2,6 +2,8 @@
 //!
 //! Ssh config params for host rule
 
+use std::collections::HashMap;
+
 use super::{Duration, PathBuf};
 
 /// Describes the ssh configuration.
@@ -56,6 +58,8 @@ pub struct HostParams {
     pub use_keychain: Option<bool>,
     /// Specifies the user to log in as.
     pub user: Option<String>,
+    /// fields that the parser wasn't able to parse
+    pub ignored_fields: HashMap<String, Vec<String>>,
 }
 
 impl HostParams {
@@ -135,6 +139,9 @@ impl HostParams {
         }
         if let Some(user) = b.user.clone() {
             self.user = Some(user);
+        }
+        if !b.ignored_fields.is_empty() {
+            self.ignored_fields = b.ignored_fields.clone();
         }
     }
 }

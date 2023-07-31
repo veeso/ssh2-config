@@ -32,7 +32,7 @@ pub enum SshParserError {
     #[error("missing argument")]
     MissingArgument,
     #[error("unknown field: {0}")]
-    UnknownField(String),
+    UnknownField(String, Vec<String>),
     #[error("IO error: {0}")]
     Io(IoError),
 }
@@ -76,16 +76,15 @@ impl SshConfigParser {
             // tokenize
             let (field, args) = match Self::tokenize(&line) {
                 Ok((field, args)) => (field, args),
-                Err(SshParserError::UnknownField(_))
-                    if rules.intersects(ParseRule::ALLOW_UNKNOWN_FIELDS) =>
+                Err(SshParserError::UnknownField(field, args))
+                    if rules.intersects(ParseRule::ALLOW_UNKNOWN_FIELDS)
+                        || current_host.params.ignored(&field) =>
                 {
-                    continue
+                    current_host.params.ignored_fields.insert(field, args);
+                    continue;
                 }
-                Err(SshParserError::UnknownField(field)) if current_host.params.ignored(&field) => {
-                    continue
-                }
-                Err(SshParserError::UnknownField(field)) => {
-                    return Err(SshParserError::UnknownField(field))
+                Err(SshParserError::UnknownField(field, args)) => {
+                    return Err(SshParserError::UnknownField(field, args))
                 }
                 Err(err) => return Err(err),
             };
@@ -328,7 +327,12 @@ impl SshConfigParser {
         let mut tokens = line.split_whitespace();
         let field = match tokens.next().map(Field::from_str) {
             Some(Ok(field)) => field,
-            Some(Err(field)) => return Err(SshParserError::UnknownField(field)),
+            Some(Err(field)) => {
+                return Err(SshParserError::UnknownField(
+                    field,
+                    tokens.map(|x| x.to_string()).collect(),
+                ))
+            }
             None => return Err(SshParserError::MissingArgument),
         };
         let args = tokens
@@ -602,6 +606,22 @@ mod test {
         assert!(SshConfig::default()
             .parse(&mut reader, ParseRule::STRICT)
             .is_err());
+    }
+
+    #[test]
+    fn should_store_unknown_fields() {
+        let temp = create_ssh_config_with_unknown_fields();
+        let file = File::open(temp.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+        let config = SshConfig::default()
+            .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
+            .unwrap();
+
+        let host = config.query("cross-platform");
+        assert_eq!(
+            host.ignored_fields.get("Piropero").unwrap(),
+            &vec![String::from("yes")]
+        );
     }
 
     #[test]
