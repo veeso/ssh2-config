@@ -14,6 +14,12 @@
 
 ---
 
+## 0.2.3
+
+Released on 05/12/2023
+
+- Fixed the order of appliance of configuration argument when overriding occurred. Thanks @LeoniePhiline
+
 ## 0.2.2
 
 Released on 31/07/2023
