@@ -133,12 +133,13 @@ mod test {
 
     #[test]
     #[cfg(target_family = "unix")]
-    fn should_parse_default_config() {
-        assert!(SshConfig::parse_default_file(ParseRule::ALLOW_UNKNOWN_FIELDS).is_ok());
+    fn should_parse_default_config() -> Result<(), parser::SshParserError> {
+        let _config = SshConfig::parse_default_file(ParseRule::ALLOW_UNKNOWN_FIELDS)?;
+        Ok(())
     }
 
     #[test]
-    fn should_parse_config() {
+    fn should_parse_config() -> Result<(), parser::SshParserError> {
         use std::fs::File;
         use std::io::BufReader;
         use std::path::Path;
@@ -148,9 +149,9 @@ mod test {
                 .expect("Could not open configuration file"),
         );
 
-        assert!(SshConfig::default()
-            .parse(&mut reader, ParseRule::STRICT)
-            .is_ok());
+        SshConfig::default().parse(&mut reader, ParseRule::STRICT)?;
+
+        Ok(())
     }
 
     #[test]

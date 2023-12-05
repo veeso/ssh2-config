@@ -568,13 +568,13 @@ mod test {
     }
 
     #[test]
-    fn should_allow_unknown_field() {
+    fn should_allow_unknown_field() -> Result<(), SshParserError> {
         let temp = create_ssh_config_with_unknown_fields();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
-        assert!(SshConfig::default()
-            .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
-            .is_ok());
+        let _config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)?;
+
+        Ok(())
     }
 
     #[test]
@@ -656,274 +656,244 @@ mod test {
     }
 
     #[test]
-    fn should_update_host_bind_address() {
+    fn should_update_host_bind_address() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::BindAddress,
             vec![String::from("127.0.0.1")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params.bind_address.as_deref().unwrap(), "127.0.0.1");
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_bind_interface() {
+    fn should_update_host_bind_interface() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
-            Field::BindInterface,
-            vec![String::from("aaa")],
-            &mut params
-        )
-        .is_ok());
+        SshConfigParser::update_host(Field::BindInterface, vec![String::from("aaa")], &mut params)?;
         assert_eq!(params.bind_interface.as_deref().unwrap(), "aaa");
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_ca_signature_algos() {
+    fn should_update_host_ca_signature_algos() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::CaSignatureAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(
             params.ca_signature_algorithms.as_deref().unwrap(),
             &["a", "b", "c"]
         );
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_certificate_file() {
+    fn should_update_host_certificate_file() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::CertificateFile,
             vec![String::from("/tmp/a.crt")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(
             params.certificate_file.as_deref().unwrap(),
             Path::new("/tmp/a.crt")
         );
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_ciphers() {
+    fn should_update_host_ciphers() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
-            Field::Ciphers,
-            vec![String::from("a,b,c")],
-            &mut params
-        )
-        .is_ok());
+        SshConfigParser::update_host(Field::Ciphers, vec![String::from("a,b,c")], &mut params)?;
         assert_eq!(params.ciphers.as_deref().unwrap(), &["a", "b", "c"]);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_compression() {
+    fn should_update_host_compression() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
-            Field::Compression,
-            vec![String::from("yes")],
-            &mut params
-        )
-        .is_ok());
+        SshConfigParser::update_host(Field::Compression, vec![String::from("yes")], &mut params)?;
         assert_eq!(params.compression.unwrap(), true);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_connection_attempts() {
+    fn should_update_host_connection_attempts() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::ConnectionAttempts,
             vec![String::from("4")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params.connection_attempts.unwrap(), 4);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_connection_timeout() {
+    fn should_update_host_connection_timeout() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
-            Field::ConnectTimeout,
-            vec![String::from("10")],
-            &mut params
-        )
-        .is_ok());
+        SshConfigParser::update_host(Field::ConnectTimeout, vec![String::from("10")], &mut params)?;
         assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(10));
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_key_algorithms() {
+    fn should_update_host_key_algorithms() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::HostKeyAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(
             params.host_key_algorithms.as_deref().unwrap(),
             &["a", "b", "c"]
         );
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_host_name() {
+    fn should_update_host_host_name() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::HostName,
             vec![String::from("192.168.1.1")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params.host_name.as_deref().unwrap(), "192.168.1.1");
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_ignore_unknown() {
+    fn should_update_host_ignore_unknown() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::IgnoreUnknown,
             vec![String::from("a,b,c")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params.ignore_unknown.as_deref().unwrap(), &["a", "b", "c"]);
+        Ok(())
     }
 
     #[test]
-    fn should_update_kex_algorithms() {
+    fn should_update_kex_algorithms() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::KexAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params.kex_algorithms.as_deref().unwrap(), &["a", "b", "c"]);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_mac() {
+    fn should_update_host_mac() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(
-            SshConfigParser::update_host(Field::Mac, vec![String::from("a,b,c")], &mut params)
-                .is_ok()
-        );
+        SshConfigParser::update_host(Field::Mac, vec![String::from("a,b,c")], &mut params)?;
         assert_eq!(params.mac.as_deref().unwrap(), &["a", "b", "c"]);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_port() {
+    fn should_update_host_port() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(
-            SshConfigParser::update_host(Field::Port, vec![String::from("2222")], &mut params)
-                .is_ok()
-        );
+        SshConfigParser::update_host(Field::Port, vec![String::from("2222")], &mut params)?;
         assert_eq!(params.port.unwrap(), 2222);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_pubkey_accepted_algos() {
+    fn should_update_host_pubkey_accepted_algos() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::PubkeyAcceptedAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(
             params.pubkey_accepted_algorithms.as_deref().unwrap(),
             &["a", "b", "c"]
         );
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_pubkey_authentication() {
+    fn should_update_host_pubkey_authentication() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::PubkeyAuthentication,
             vec![String::from("yes")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params.pubkey_authentication.unwrap(), true);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_remote_forward() {
+    fn should_update_host_remote_forward() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::RemoteForward,
             vec![String::from("3005")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params.remote_forward.unwrap(), 3005);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_server_alive_interval() {
+    fn should_update_host_server_alive_interval() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::ServerAliveInterval,
             vec![String::from("40")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(
             params.server_alive_interval.unwrap(),
             Duration::from_secs(40)
         );
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_tcp_keep_alive() {
+    fn should_update_host_tcp_keep_alive() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
-            Field::TcpKeepAlive,
-            vec![String::from("no")],
-            &mut params
-        )
-        .is_ok());
+        SshConfigParser::update_host(Field::TcpKeepAlive, vec![String::from("no")], &mut params)?;
         assert_eq!(params.tcp_keep_alive.unwrap(), false);
+        Ok(())
     }
 
     #[test]
-    fn should_update_host_user() {
+    fn should_update_host_user() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
-            Field::User,
-            vec![String::from("pippo")],
-            &mut params
-        )
-        .is_ok());
+        SshConfigParser::update_host(Field::User, vec![String::from("pippo")], &mut params)?;
         assert_eq!(params.user.as_deref().unwrap(), "pippo");
+        Ok(())
     }
 
     #[test]
-    fn should_not_update_host_if_unknown() {
+    fn should_not_update_host_if_unknown() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        assert!(SshConfigParser::update_host(
+        SshConfigParser::update_host(
             Field::AddKeysToAgent,
             vec![String::from("yes")],
-            &mut params
-        )
-        .is_ok());
+            &mut params,
+        )?;
         assert_eq!(params, HostParams::default());
+        Ok(())
     }
 
     #[test]
-    fn should_tokenize_line() {
+    fn should_tokenize_line() -> Result<(), SshParserError> {
         assert_eq!(
-            SshConfigParser::tokenize("HostName 192.168.*.* 172.26.*.*")
-                .ok()
-                .unwrap(),
+            SshConfigParser::tokenize("HostName 192.168.*.* 172.26.*.*")?,
             (
                 Field::HostName,
                 vec![String::from("192.168.*.*"), String::from("172.26.*.*")]
@@ -933,14 +903,13 @@ mod test {
         assert_eq!(
             SshConfigParser::tokenize(
                 "      HostName        192.168.*.*        172.26.*.*        "
-            )
-            .ok()
-            .unwrap(),
+            )?,
             (
                 Field::HostName,
                 vec![String::from("192.168.*.*"), String::from("172.26.*.*")]
             )
         );
+        Ok(())
     }
 
     #[test]
@@ -960,19 +929,16 @@ mod test {
     }
 
     #[test]
-    fn should_parse_boolean() {
+    fn should_parse_boolean() -> Result<(), SshParserError> {
         assert_eq!(
-            SshConfigParser::parse_boolean(vec![String::from("yes")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_boolean(vec![String::from("yes")])?,
             true
         );
         assert_eq!(
-            SshConfigParser::parse_boolean(vec![String::from("no")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_boolean(vec![String::from("no")])?,
             false
         );
+        Ok(())
     }
 
     #[test]
@@ -988,11 +954,9 @@ mod test {
     }
 
     #[test]
-    fn should_parse_comma_separated_list() {
+    fn should_parse_comma_separated_list() -> Result<(), SshParserError> {
         assert_eq!(
-            SshConfigParser::parse_comma_separated_list(vec![String::from("a,b,c,d")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_comma_separated_list(vec![String::from("a,b,c,d")])?,
             vec![
                 "a".to_string(),
                 "b".to_string(),
@@ -1001,11 +965,10 @@ mod test {
             ]
         );
         assert_eq!(
-            SshConfigParser::parse_comma_separated_list(vec![String::from("a")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_comma_separated_list(vec![String::from("a")])?,
             vec!["a".to_string()]
         );
+        Ok(())
     }
 
     #[test]
@@ -1017,13 +980,12 @@ mod test {
     }
 
     #[test]
-    fn should_parse_duration() {
+    fn should_parse_duration() -> Result<(), SshParserError> {
         assert_eq!(
-            SshConfigParser::parse_duration(vec![String::from("60")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_duration(vec![String::from("60")])?,
             Duration::from_secs(60)
         );
+        Ok(())
     }
 
     #[test]
@@ -1039,16 +1001,14 @@ mod test {
     }
 
     #[test]
-    fn should_parse_host() {
+    fn should_parse_host() -> Result<(), SshParserError> {
         assert_eq!(
             SshConfigParser::parse_host(vec![
                 String::from("192.168.*.*"),
                 String::from("!192.168.1.1"),
                 String::from("172.26.104.*"),
                 String::from("!172.26.104.10"),
-            ])
-            .ok()
-            .unwrap(),
+            ])?,
             vec![
                 HostClause::new(String::from("192.168.*.*"), false),
                 HostClause::new(String::from("192.168.1.1"), true),
@@ -1056,6 +1016,7 @@ mod test {
                 HostClause::new(String::from("172.26.104.10"), true),
             ]
         );
+        Ok(())
     }
 
     #[test]
@@ -1067,38 +1028,35 @@ mod test {
     }
 
     #[test]
-    fn should_parse_path() {
+    fn should_parse_path() -> Result<(), SshParserError> {
         assert_eq!(
-            SshConfigParser::parse_path(vec![String::from("/tmp/a.txt")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_path(vec![String::from("/tmp/a.txt")])?,
             PathBuf::from("/tmp/a.txt")
         );
+        Ok(())
     }
 
     #[test]
-    fn should_parse_path_and_resolve_tilde() {
+    fn should_parse_path_and_resolve_tilde() -> Result<(), SshParserError> {
         let mut expected = dirs::home_dir().unwrap();
         expected.push(".ssh/id_dsa");
         assert_eq!(
-            SshConfigParser::parse_path(vec![String::from("~/.ssh/id_dsa")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_path(vec![String::from("~/.ssh/id_dsa")])?,
             expected
         );
+        Ok(())
     }
 
     #[test]
-    fn should_parse_path_list() {
+    fn should_parse_path_list() -> Result<(), SshParserError> {
         assert_eq!(
             SshConfigParser::parse_path_list(vec![
                 String::from("/tmp/a.txt"),
                 String::from("/tmp/b.txt")
-            ])
-            .ok()
-            .unwrap(),
+            ])?,
             vec![PathBuf::from("/tmp/a.txt"), PathBuf::from("/tmp/b.txt")]
         );
+        Ok(())
     }
 
     #[test]
@@ -1118,13 +1076,9 @@ mod test {
     }
 
     #[test]
-    fn should_parse_port() {
-        assert_eq!(
-            SshConfigParser::parse_port(vec![String::from("22")])
-                .ok()
-                .unwrap(),
-            22
-        );
+    fn should_parse_port() -> Result<(), SshParserError> {
+        assert_eq!(SshConfigParser::parse_port(vec![String::from("22")])?, 22);
+        Ok(())
     }
 
     #[test]
@@ -1140,13 +1094,12 @@ mod test {
     }
 
     #[test]
-    fn should_parse_string() {
+    fn should_parse_string() -> Result<(), SshParserError> {
         assert_eq!(
-            SshConfigParser::parse_string(vec![String::from("foobar")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_string(vec![String::from("foobar")])?,
             String::from("foobar")
         );
+        Ok(())
     }
 
     #[test]
@@ -1158,13 +1111,12 @@ mod test {
     }
 
     #[test]
-    fn should_parse_unsigned() {
+    fn should_parse_unsigned() -> Result<(), SshParserError> {
         assert_eq!(
-            SshConfigParser::parse_unsigned(vec![String::from("43")])
-                .ok()
-                .unwrap(),
+            SshConfigParser::parse_unsigned(vec![String::from("43")])?,
             43
         );
+        Ok(())
     }
 
     #[test]
