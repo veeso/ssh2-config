@@ -582,9 +582,12 @@ mod test {
         let temp = create_ssh_config_with_unknown_fields();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
-        assert!(SshConfig::default()
-            .parse(&mut reader, ParseRule::STRICT)
-            .is_err());
+        assert!(matches!(
+            SshConfig::default()
+                .parse(&mut reader, ParseRule::STRICT)
+                .unwrap_err(),
+            SshParserError::UnknownField(..)
+        ));
     }
 
     #[test]
@@ -942,12 +945,18 @@ mod test {
 
     #[test]
     fn should_not_tokenize_line() {
-        assert!(SshConfigParser::tokenize("Omar     yes").is_err());
+        assert!(matches!(
+            SshConfigParser::tokenize("Omar     yes").unwrap_err(),
+            SshParserError::UnknownField(..)
+        ));
     }
 
     #[test]
     fn should_fail_parsing_field() {
-        assert!(SshConfigParser::tokenize("                  ").is_err());
+        assert!(matches!(
+            SshConfigParser::tokenize("                  ").unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -968,8 +977,14 @@ mod test {
 
     #[test]
     fn should_fail_parsing_boolean() {
-        assert!(SshConfigParser::parse_boolean(vec!["boh".to_string()]).is_err());
-        assert!(SshConfigParser::parse_boolean(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_boolean(vec!["boh".to_string()]).unwrap_err(),
+            SshParserError::ExpectedBoolean
+        ));
+        assert!(matches!(
+            SshConfigParser::parse_boolean(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -995,7 +1010,10 @@ mod test {
 
     #[test]
     fn should_fail_parsing_comma_separated_list() {
-        assert!(SshConfigParser::parse_comma_separated_list(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_comma_separated_list(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -1010,8 +1028,14 @@ mod test {
 
     #[test]
     fn should_fail_parsing_duration() {
-        assert!(SshConfigParser::parse_duration(vec![String::from("AAA")]).is_err());
-        assert!(SshConfigParser::parse_duration(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_duration(vec![String::from("AAA")]).unwrap_err(),
+            SshParserError::ExpectedUnsigned
+        ));
+        assert!(matches!(
+            SshConfigParser::parse_duration(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -1036,7 +1060,10 @@ mod test {
 
     #[test]
     fn should_fail_parsing_host() {
-        assert!(SshConfigParser::parse_host(vec![]).is_err())
+        assert!(matches!(
+            SshConfigParser::parse_host(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -1076,12 +1103,18 @@ mod test {
 
     #[test]
     fn should_fail_parse_path_list() {
-        assert!(SshConfigParser::parse_path_list(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_path_list(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
     fn should_fail_parsing_path() {
-        assert!(SshConfigParser::parse_path(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_path(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -1096,8 +1129,14 @@ mod test {
 
     #[test]
     fn should_fail_parsing_port() {
-        assert!(SshConfigParser::parse_port(vec![String::from("1234567")]).is_err());
-        assert!(SshConfigParser::parse_port(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_port(vec![String::from("1234567")]).unwrap_err(),
+            SshParserError::ExpectedPort
+        ));
+        assert!(matches!(
+            SshConfigParser::parse_port(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -1112,7 +1151,10 @@ mod test {
 
     #[test]
     fn should_fail_parsing_string() {
-        assert!(SshConfigParser::parse_string(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_string(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
@@ -1127,8 +1169,14 @@ mod test {
 
     #[test]
     fn should_fail_parsing_unsigned() {
-        assert!(SshConfigParser::parse_unsigned(vec![String::from("abc")]).is_err());
-        assert!(SshConfigParser::parse_unsigned(vec![]).is_err());
+        assert!(matches!(
+            SshConfigParser::parse_unsigned(vec![String::from("abc")]).unwrap_err(),
+            SshParserError::ExpectedUnsigned
+        ));
+        assert!(matches!(
+            SshConfigParser::parse_unsigned(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
     }
 
     #[test]
