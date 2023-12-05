@@ -2,8 +2,6 @@
 //!
 //! Ssh host type
 
-use std::cmp::Ordering;
-
 use wildmatch::WildMatch;
 
 use super::HostParams;
@@ -36,28 +34,6 @@ impl Host {
     }
 }
 
-impl std::cmp::PartialOrd for Host {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let self_max_pattern = self.pattern.iter().max_by(|x, y| x.cmp(y));
-        let other_max_pattern = other.pattern.iter().max_by(|x, y| x.cmp(y));
-        match (self_max_pattern, other_max_pattern) {
-            (Some(_self), Some(other)) => Some(_self.cmp(other)),
-            _ => None,
-        }
-    }
-}
-
-impl std::cmp::Ord for Host {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let self_max_pattern = self.pattern.iter().max_by(|x, y| x.cmp(y));
-        let other_max_pattern = other.pattern.iter().max_by(|x, y| x.cmp(y));
-        match (self_max_pattern, other_max_pattern) {
-            (Some(_self), Some(other)) => _self.cmp(other),
-            _ => Ordering::Equal,
-        }
-    }
-}
-
 /// Describes a single clause to match host
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostClause {
@@ -74,18 +50,6 @@ impl HostClause {
     /// Returns whether `host` argument intersects the clause
     pub fn intersects(&self, host: &str) -> bool {
         WildMatch::new(self.pattern.as_str()).matches(host)
-    }
-}
-
-impl std::cmp::PartialOrd for HostClause {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.pattern.cmp(&other.pattern))
-    }
-}
-
-impl std::cmp::Ord for HostClause {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.pattern.cmp(&other.pattern)
     }
 }
 
