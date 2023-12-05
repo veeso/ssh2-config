@@ -43,7 +43,6 @@
 //!
 //! let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
 //!
-//! let default_params = config.default_params();
 //! // Query parameters for your host
 //! // If there's no rule for your host, default params are returned
 //! let params = config.query("192.168.1.2");
@@ -69,41 +68,25 @@ pub use parser::{ParseRule, SshParserError, SshParserResult};
 
 /// Describes the ssh configuration.
 /// Configuration is describes in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SshConfig {
     /// Rulesets for hosts.
     /// Default config will be stored with key `*`
     hosts: Vec<Host>,
 }
 
-impl Default for SshConfig {
-    fn default() -> Self {
-        Self {
-            hosts: vec![Host::new(
-                vec![HostClause::new(String::from("*"), false)],
-                HostParams::default(),
-            )],
-        }
-    }
-}
-
 impl SshConfig {
     /// Query params for a certain host
     pub fn query<S: AsRef<str>>(&self, host: S) -> HostParams {
-        let mut params = self.default_params();
-        // iter keys
-        for cfg_host in self.hosts.iter() {
+        let mut params = HostParams::default();
+        // iter keys, merge from lowest to highest precedence
+        for cfg_host in self.hosts.iter().rev() {
             if cfg_host.intersects(host.as_ref()) {
                 params.merge(&cfg_host.params);
             }
         }
         // return calculated params
         params
-    }
-
-    /// Get default params
-    pub fn default_params(&self) -> HostParams {
-        self.hosts.get(0).map(|x| x.params.clone()).unwrap()
     }
 
     /// Parse stream and return parsed configuration or parser error
@@ -144,19 +127,19 @@ mod test {
     #[test]
     fn should_init_ssh_config() {
         let config = SshConfig::default();
-        assert_eq!(config.hosts.len(), 1);
-        assert_eq!(config.default_params(), HostParams::default());
+        assert_eq!(config.hosts.len(), 0);
         assert_eq!(config.query("192.168.1.2"), HostParams::default());
     }
 
     #[test]
     #[cfg(target_family = "unix")]
-    fn should_parse_default_config() {
-        assert!(SshConfig::parse_default_file(ParseRule::ALLOW_UNKNOWN_FIELDS).is_ok());
+    fn should_parse_default_config() -> Result<(), parser::SshParserError> {
+        let _config = SshConfig::parse_default_file(ParseRule::ALLOW_UNKNOWN_FIELDS)?;
+        Ok(())
     }
 
     #[test]
-    fn should_parse_config() {
+    fn should_parse_config() -> Result<(), parser::SshParserError> {
         use std::fs::File;
         use std::io::BufReader;
         use std::path::Path;
@@ -166,9 +149,9 @@ mod test {
                 .expect("Could not open configuration file"),
         );
 
-        assert!(SshConfig::default()
-            .parse(&mut reader, ParseRule::STRICT)
-            .is_ok());
+        SshConfig::default().parse(&mut reader, ParseRule::STRICT)?;
+
+        Ok(())
     }
 
     #[test]
@@ -203,6 +186,6 @@ mod test {
         assert_eq!(config.query("192.168.10.1"), params1);
         // Negated case
         assert_eq!(config.query("172.26.254.1"), params3);
-        assert_eq!(config.query("172.26.104.4"), config.default_params());
+        assert_eq!(config.query("172.26.104.4"), HostParams::default());
     }
 }

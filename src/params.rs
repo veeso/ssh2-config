@@ -73,20 +73,29 @@ impl HostParams {
 
     /// Override current params with params of `b`
     pub fn merge(&mut self, b: &Self) {
-        if let Some(bind_address) = b.bind_address.clone() {
-            self.bind_address = Some(bind_address);
+        if let Some(bind_address) = b.bind_address.as_deref() {
+            self.bind_address = Some(bind_address.to_owned());
         }
-        if let Some(bind_interface) = b.bind_interface.clone() {
-            self.bind_interface = Some(bind_interface);
+        if let Some(bind_interface) = b.bind_interface.as_deref() {
+            self.bind_interface = Some(bind_interface.to_owned());
         }
-        if let Some(ca_signature_algorithms) = b.ca_signature_algorithms.clone() {
-            self.ca_signature_algorithms = Some(ca_signature_algorithms);
+        if let Some(ca_signature_algorithms) = b.ca_signature_algorithms.as_deref() {
+            if self.ca_signature_algorithms.is_none() {
+                self.ca_signature_algorithms = Some(Vec::new());
+            }
+            Self::resolve_algorithms(
+                self.ca_signature_algorithms.as_mut().unwrap(),
+                ca_signature_algorithms,
+            );
         }
-        if let Some(certificate_file) = b.certificate_file.clone() {
-            self.certificate_file = Some(certificate_file);
+        if let Some(certificate_file) = b.certificate_file.as_deref() {
+            self.certificate_file = Some(certificate_file.to_owned());
         }
-        if let Some(ciphers) = b.ciphers.clone() {
-            self.ciphers = Some(ciphers);
+        if let Some(ciphers) = b.ciphers.as_deref() {
+            if self.ciphers.is_none() {
+                self.ciphers = Some(Vec::new());
+            }
+            Self::resolve_algorithms(self.ciphers.as_mut().unwrap(), ciphers);
         }
         if let Some(compression) = b.compression {
             self.compression = Some(compression);
@@ -97,29 +106,47 @@ impl HostParams {
         if let Some(connect_timeout) = b.connect_timeout {
             self.connect_timeout = Some(connect_timeout);
         }
-        if let Some(host_key_algorithms) = b.host_key_algorithms.clone() {
-            self.host_key_algorithms = Some(host_key_algorithms);
+        if let Some(host_key_algorithms) = b.host_key_algorithms.as_deref() {
+            if self.host_key_algorithms.is_none() {
+                self.host_key_algorithms = Some(Vec::new());
+            }
+            Self::resolve_algorithms(
+                self.host_key_algorithms.as_mut().unwrap(),
+                host_key_algorithms,
+            );
         }
-        if let Some(host_name) = b.host_name.clone() {
-            self.host_name = Some(host_name);
+        if let Some(host_name) = b.host_name.as_deref() {
+            self.host_name = Some(host_name.to_owned());
         }
-        if let Some(identity_file) = b.identity_file.clone() {
-            self.identity_file = Some(identity_file);
+        if let Some(identity_file) = b.identity_file.as_deref() {
+            self.identity_file = Some(identity_file.to_owned());
         }
-        if let Some(ignore_unknown) = b.ignore_unknown.clone() {
-            self.ignore_unknown = Some(ignore_unknown);
+        if let Some(ignore_unknown) = b.ignore_unknown.as_deref() {
+            self.ignore_unknown = Some(ignore_unknown.to_owned());
         }
-        if let Some(kex_algorithms) = b.kex_algorithms.clone() {
-            self.kex_algorithms = Some(kex_algorithms);
+        if let Some(kex_algorithms) = b.kex_algorithms.as_deref() {
+            if self.kex_algorithms.is_none() {
+                self.kex_algorithms = Some(Vec::new());
+            }
+            Self::resolve_algorithms(self.kex_algorithms.as_mut().unwrap(), kex_algorithms);
         }
-        if let Some(mac) = b.mac.clone() {
-            self.mac = Some(mac);
+        if let Some(mac) = b.mac.as_deref() {
+            if self.mac.is_none() {
+                self.mac = Some(Vec::new());
+            }
+            Self::resolve_algorithms(self.mac.as_mut().unwrap(), mac);
         }
         if let Some(port) = b.port {
             self.port = Some(port);
         }
-        if let Some(pubkey_accepted_algorithms) = b.pubkey_accepted_algorithms.clone() {
-            self.pubkey_accepted_algorithms = Some(pubkey_accepted_algorithms);
+        if let Some(pubkey_accepted_algorithms) = b.pubkey_accepted_algorithms.as_deref() {
+            if self.pubkey_accepted_algorithms.is_none() {
+                self.pubkey_accepted_algorithms = Some(Vec::new());
+            }
+            Self::resolve_algorithms(
+                self.pubkey_accepted_algorithms.as_mut().unwrap(),
+                pubkey_accepted_algorithms,
+            );
         }
         if let Some(pubkey_authentication) = b.pubkey_authentication {
             self.pubkey_authentication = Some(pubkey_authentication);
@@ -137,11 +164,47 @@ impl HostParams {
         if let Some(use_keychain) = b.use_keychain {
             self.use_keychain = Some(use_keychain);
         }
-        if let Some(user) = b.user.clone() {
-            self.user = Some(user);
+        if let Some(user) = b.user.as_deref() {
+            self.user = Some(user.to_owned());
         }
         if !b.ignored_fields.is_empty() {
-            self.ignored_fields = b.ignored_fields.clone();
+            for (ignored_field, args) in &b.ignored_fields {
+                if !self.ignored_fields.contains_key(ignored_field) {
+                    self.ignored_fields
+                        .insert(ignored_field.to_owned(), args.to_owned());
+                }
+            }
+        }
+    }
+
+    /// Resolve algorithms list.
+    /// if the first argument starts with `+`, then the provided algorithms are PUSHED onto existing list
+    /// if the first argument starts with `-`, then the provided algorithms are REMOVED from existing list
+    /// otherwise the provided list will JUST replace the existing list
+    fn resolve_algorithms(current_list: &mut Vec<String>, algos: &[String]) {
+        if algos.is_empty() {
+            return;
+        }
+        let first = algos.first().unwrap();
+        if first.starts_with('+') {
+            // Concat
+            for algo in [first.replacen('+', "", 1)].iter().chain(algos[1..].iter()) {
+                if !current_list.contains(algo) {
+                    current_list.push(algo.to_owned());
+                }
+            }
+        } else if first.starts_with('-') {
+            // Remove
+            let new_first = [first.replacen('-', "", 1)];
+            // Remove algos from current_list
+            current_list.retain(|algo| {
+                !new_first
+                    .iter()
+                    .chain(algos[1..].iter())
+                    .any(|remove| remove == algo)
+            });
+        } else {
+            *current_list = algos.to_vec();
         }
     }
 }
@@ -235,5 +298,82 @@ mod test {
         b.tcp_keep_alive = None;
         params.merge(&b);
         assert_eq!(params.tcp_keep_alive.unwrap(), true);
+    }
+
+    #[test]
+    fn should_resolve_algorithms_list_when_preceeded_by_plus() {
+        let mut list = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ];
+        let algos = [
+            "+1".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "3".to_string(),
+            "d".to_string(),
+        ];
+        HostParams::resolve_algorithms(&mut list, &algos);
+        assert_eq!(
+            list,
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+                "e".to_string(),
+                "1".to_string(),
+                "3".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn should_resolve_algorithms_list_when_preceeded_by_minus() {
+        let mut list = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ];
+        let algos = ["-a".to_string(), "b".to_string(), "3".to_string()];
+        HostParams::resolve_algorithms(&mut list, &algos);
+        assert_eq!(
+            list,
+            vec!["c".to_string(), "d".to_string(), "e".to_string(),]
+        );
+    }
+
+    #[test]
+    fn should_resolve_algorithm_list_when_replacing() {
+        let mut list = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+            "e".to_string(),
+        ];
+        let algos = [
+            "1".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "3".to_string(),
+            "d".to_string(),
+        ];
+        HostParams::resolve_algorithms(&mut list, &algos);
+        assert_eq!(
+            list,
+            vec![
+                "1".to_string(),
+                "a".to_string(),
+                "b".to_string(),
+                "3".to_string(),
+                "d".to_string(),
+            ]
+        );
     }
 }
