@@ -60,6 +60,8 @@ pub struct HostParams {
     pub user: Option<String>,
     /// fields that the parser wasn't able to parse
     pub ignored_fields: HashMap<String, Vec<String>>,
+    /// fields that the parser was able to parse but ignored
+    pub unsupported_fields: HashMap<String, Vec<String>>,
 }
 
 impl HostParams {
@@ -172,6 +174,14 @@ impl HostParams {
                 if !self.ignored_fields.contains_key(ignored_field) {
                     self.ignored_fields
                         .insert(ignored_field.to_owned(), args.to_owned());
+                }
+            }
+        }
+        if !b.unsupported_fields.is_empty() {
+            for (unsupported_field, args) in &b.unsupported_fields {
+                if !self.unsupported_fields.contains_key(unsupported_field) {
+                    self.unsupported_fields
+                        .insert(unsupported_field.to_owned(), args.to_owned());
                 }
             }
         }
