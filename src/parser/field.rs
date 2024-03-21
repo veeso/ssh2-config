@@ -2,6 +2,7 @@
 //!
 //! Ssh config fields
 
+use std::fmt;
 use std::str::FromStr;
 
 /// Configuration field.
@@ -212,6 +213,110 @@ impl FromStr for Field {
             // -- unknwon field
             _ => Err(s.to_string()),
         }
+    }
+}
+
+impl fmt::Display for Field {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Host => "host",
+            Self::BindAddress => "bindaddress",
+            Self::BindInterface => "bindinterface",
+            Self::CaSignatureAlgorithms => "casignaturealgorithms",
+            Self::CertificateFile => "certificatefile",
+            Self::Ciphers => "ciphers",
+            Self::Compression => "compression",
+            Self::ConnectionAttempts => "connectionattempts",
+            Self::ConnectTimeout => "connecttimeout",
+            Self::HostKeyAlgorithms => "hostkeyalgorithms",
+            Self::HostName => "hostname",
+            Self::IdentityFile => "identityfile",
+            Self::IgnoreUnknown => "ignoreunknown",
+            Self::KexAlgorithms => "kexalgorithms",
+            Self::Mac => "macs",
+            Self::Port => "port",
+            Self::PubkeyAcceptedAlgorithms => "pubkeyacceptedalgorithms",
+            Self::PubkeyAuthentication => "pubkeyauthentication",
+            Self::RemoteForward => "remoteforward",
+            Self::ServerAliveInterval => "serveraliveinterval",
+            Self::TcpKeepAlive => "tcpkeepalive",
+            #[cfg(target_os = "macos")]
+            Self::UseKeychain => "usekeychain",
+            Self::User => "user",
+            // Continuation of the rest of the enum variants
+            Self::AddKeysToAgent => "addkeystoagent",
+            Self::AddressFamily => "addressfamily",
+            Self::BatchMode => "batchmode",
+            Self::CanonicalDomains => "canonicaldomains",
+            Self::CanonicalizeFallbackLock => "canonicalizefallbacklock",
+            Self::CanonicalizeHostname => "canonicalizehostname",
+            Self::CanonicalizeMaxDots => "canonicalizemaxdots",
+            Self::CanonicalizePermittedCNAMEs => "canonicalizepermittedcnames",
+            Self::CheckHostIP => "checkhostip",
+            Self::ClearAllForwardings => "clearallforwardings",
+            Self::ControlMaster => "controlmaster",
+            Self::ControlPath => "controlpath",
+            Self::ControlPersist => "controlpersist",
+            Self::DynamicForward => "dynamicforward",
+            Self::EnableSSHKeysign => "enablesshkeysign",
+            Self::EscapeChar => "escapechar",
+            Self::ExitOnForwardFailure => "exitonforwardfailure",
+            Self::FingerprintHash => "fingerprinthash",
+            Self::ForkAfterAuthentication => "forkafterauthentication",
+            Self::ForwardAgent => "forwardagent",
+            Self::ForwardX11 => "forwardx11",
+            Self::ForwardX11Timeout => "forwardx11timeout",
+            Self::ForwardX11Trusted => "forwardx11trusted",
+            Self::GatewayPorts => "gatewayports",
+            Self::GlobalKnownHostsFile => "globalknownhostsfile",
+            Self::GSSAPIAuthentication => "gssapiauthentication",
+            Self::GSSAPIDelegateCredentials => "gssapidelegatecredentials",
+            Self::HashKnownHosts => "hashknownhosts",
+            Self::HostbasedAcceptedAlgorithms => "hostbasedacceptedalgorithms",
+            Self::HostbasedAuthentication => "hostbasedauthentication",
+            Self::HostKeyAlias => "hostkeyalias",
+            Self::HostbasedKeyTypes => "hostbasedkeytypes",
+            Self::IdentitiesOnly => "identitiesonly",
+            Self::IdentityAgent => "identityagent",
+            Self::Include => "include",
+            Self::IPQoS => "ipqos",
+            Self::KbdInteractiveAuthentication => "kbdinteractiveauthentication",
+            Self::KbdInteractiveDevices => "kbdinteractivedevices",
+            Self::KnownHostsCommand => "knownhostscommand",
+            Self::LocalCommand => "localcommand",
+            Self::LocalForward => "localforward",
+            Self::LogLevel => "loglevel",
+            Self::LogVerbose => "logverbose",
+            Self::NoHostAuthenticationForLocalhost => "nohostauthenticationforlocalhost",
+            Self::NumberOfPasswordPrompts => "numberofpasswordprompts",
+            Self::PasswordAuthentication => "passwordauthentication",
+            Self::PermitLocalCommand => "permitlocalcommand",
+            Self::PermitRemoteOpen => "permitremoteopen",
+            Self::PKCS11Provider => "pkcs11provider",
+            Self::PreferredAuthentications => "preferredauthentications",
+            Self::ProxyCommand => "proxycommand",
+            Self::ProxyJump => "proxyjump",
+            Self::ProxyUseFdpass => "proxyusefdpass",
+            Self::PubkeyAcceptedKeyTypes => "pubkeyacceptedkeytypes",
+            Self::RekeyLimit => "rekeylimit",
+            Self::RequestTTY => "requesttty",
+            Self::RevokedHostKeys => "revokedhostkeys",
+            Self::SecruityKeyProvider => "secruitykeyprovider",
+            Self::SendEnv => "sendenv",
+            Self::ServerAliveCountMax => "serveralivecountmax",
+            Self::SessionType => "sessiontype",
+            Self::SetEnv => "setenv",
+            Self::StdinNull => "stdinnull",
+            Self::StreamLocalBindMask => "streamlocalbindmask",
+            Self::StrictHostKeyChecking => "stricthostkeychecking",
+            Self::SyslogFacility => "syslogfacility",
+            Self::UpdateHostKeys => "updatehostkeys",
+            Self::UserKnownHostsFile => "userknownhostsfile",
+            Self::VerifyHostKeyDNS => "verifyhostkeydns",
+            Self::VisualHostKey => "visualhostkey",
+            Self::XAuthLocation => "xauthlocation",
+        };
+        write!(f, "{}", s)
     }
 }
 
