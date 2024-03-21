@@ -118,12 +118,16 @@ impl SshConfigParser {
                 // Update field
                 match Self::update_host(field, args, &mut current_host.params) {
                     Ok(()) => Ok(()),
+                    // If we're allowing unsupported fields to be parsed, add them to the map
                     Err(SshParserError::UnsupportedField(field, args))
                         if rules.intersects(ParseRule::ALLOW_UNSUPPORTED_FIELDS) =>
                     {
                         current_host.params.unsupported_fields.insert(field, args);
                         Ok(())
                     }
+                    // Eat the error here to not break the API with this change
+                    // Also it'd be weird to error on correct ssh_config's just because they're
+                    // not supported by this library
                     Err(SshParserError::UnsupportedField(_, _)) => Ok(()),
                     e => e,
                 }?;
