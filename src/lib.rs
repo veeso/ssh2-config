@@ -158,20 +158,26 @@ mod test {
     fn should_query_ssh_config() {
         let mut config = SshConfig::default();
         // add config
-        let mut params1 = HostParams::default();
-        params1.bind_address = Some(String::from("0.0.0.0"));
+        let mut params1 = HostParams {
+            bind_address: Some(String::from("0.0.0.0")),
+            ..Default::default()
+        };
         config.hosts.push(Host::new(
             vec![HostClause::new(String::from("192.168.*.*"), false)],
             params1.clone(),
         ));
-        let mut params2 = HostParams::default();
-        params2.bind_interface = Some(String::from("tun0"));
+        let params2 = HostParams {
+            bind_interface: Some(String::from("tun0")),
+            ..Default::default()
+        };
         config.hosts.push(Host::new(
             vec![HostClause::new(String::from("192.168.10.*"), false)],
             params2.clone(),
         ));
-        let mut params3 = HostParams::default();
-        params3.host_name = Some(String::from("172.26.104.4"));
+        let params3 = HostParams {
+            host_name: Some(String::from("172.26.104.4")),
+            ..Default::default()
+        };
         config.hosts.push(Host::new(
             vec![
                 HostClause::new(String::from("172.26.*.*"), false),
