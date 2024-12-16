@@ -60,10 +60,7 @@ fn connect(host: &str, params: &HostParams) {
         Some(h) => h,
         None => host,
     };
-    let port = match params.port {
-        None => 22,
-        Some(p) => p,
-    };
+    let port = params.port.unwrap_or(22);
     let host = match host.contains(':') {
         true => host.to_string(),
         false => format!("{}:{}", host, port),

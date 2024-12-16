@@ -10,20 +10,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: sudo apt update && sudo apt install -y libssh2-1-dev libssl-dev && mkdir -p $HOME/.ssh && touch $HOME/.ssh/config
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
         with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
+          cache-on-failure: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Set up environment for tests
+        run: mkdir -p $HOME/.ssh && touch $HOME/.ssh/config
+      - name: Style check
+        run: cargo fmt --all --check
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-fail-fast
-      - name: Format
-        run: cargo fmt --all -- --check
+        run: cargo test
       - name: Clippy
         run: cargo clippy -- -Dwarnings
