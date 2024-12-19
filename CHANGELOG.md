@@ -1,6 +1,8 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.3.0](#030)
+  - [0.2.3](#023)
   - [0.2.2](#022)
   - [0.2.1](#021)
   - [0.2.0](#020)
@@ -13,6 +15,32 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.3.0
+
+Released on 19/12/2024
+
+- thiserror `2.0`
+- ‼️ **BREAKING CHANGE**: Added support for unsupported fields:
+
+    `AddressFamily, BatchMode, CanonicalDomains, CanonicalizeFallbackLock, CanonicalizeHostname, CanonicalizeMaxDots, CanonicalizePermittedCNAMEs, CheckHostIP, ClearAllForwardings, ControlMaster, ControlPath, ControlPersist, DynamicForward, EnableSSHKeysign, EscapeChar, ExitOnForwardFailure, FingerprintHash, ForkAfterAuthentication, ForwardAgent, ForwardX11, ForwardX11Timeout, ForwardX11Trusted, GatewayPorts, GlobalKnownHostsFile, GSSAPIAuthentication, GSSAPIDelegateCredentials, HashKnownHosts, HostbasedAcceptedAlgorithms, HostbasedAuthentication, HostKeyAlias, HostbasedKeyTypes, IdentitiesOnly, IdentityAgent, Include, IPQoS, KbdInteractiveAuthentication, KbdInteractiveDevices, KnownHostsCommand, LocalCommand, LocalForward, LogLevel, LogVerbose, NoHostAuthenticationForLocalhost, NumberOfPasswordPrompts, PasswordAuthentication, PermitLocalCommand, PermitRemoteOpen, PKCS11Provider, PreferredAuthentications, ProxyCommand, ProxyJump, ProxyUseFdpass, PubkeyAcceptedKeyTypes, RekeyLimit, RequestTTY, RevokedHostKeys, SecruityKeyProvider, SendEnv, ServerAliveCountMax, SessionType, SetEnv, StdinNull, StreamLocalBindMask, StrictHostKeyChecking, SyslogFacility, UpdateHostKeys, UserKnownHostsFile, VerifyHostKeyDNS, VisualHostKey, XAuthLocation`
+
+    If you want to keep the behaviour as-is, use `ParseRule::STRICT | ParseRule::ALLOW_UNSUPPORTED_FIELDS` when calling `parse()` if you were using `ParseRule::STRICT` before.
+
+    Otherwise you can now access unsupported fields by using the `unsupported_fields` field on the `HostParams` structure like this:
+
+    ```rust
+    use ssh2_config::{ParseRule, SshConfig};
+    use std::fs::File;
+    use std::io::BufReader;
+
+    let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+    let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
+
+    // Query attributes for a certain host
+    let params = config.query("192.168.1.2");
+    let forwards = params.unsupported_fields.get("dynamicforward");
+    ```
 
 ## 0.2.3
 
