@@ -324,7 +324,7 @@ impl SshConfigParser {
 
     /// parse boolean value
     fn parse_boolean(args: Vec<String>) -> SshParserResult<bool> {
-        match args.get(0).map(|x| x.as_str()) {
+        match args.first().map(|x| x.as_str()) {
             Some("yes") => Ok(true),
             Some("no") => Ok(false),
             Some(_) => Err(SshParserError::ExpectedBoolean),
@@ -335,7 +335,7 @@ impl SshConfigParser {
     /// Parse comma separated list arguments
     fn parse_comma_separated_list(args: Vec<String>) -> SshParserResult<Vec<String>> {
         match args
-            .get(0)
+            .first()
             .map(|x| x.split(',').map(|x| x.to_string()).collect())
         {
             Some(args) => Ok(args),
@@ -380,7 +380,7 @@ impl SshConfigParser {
 
     /// Parse path argument
     fn parse_path(args: Vec<String>) -> SshParserResult<PathBuf> {
-        if let Some(s) = args.get(0) {
+        if let Some(s) = args.first() {
             Self::parse_path_arg(s)
         } else {
             Err(SshParserError::MissingArgument)
@@ -404,7 +404,7 @@ impl SshConfigParser {
 
     /// Parse port number argument
     fn parse_port(args: Vec<String>) -> SshParserResult<u16> {
-        match args.get(0).map(|x| u16::from_str(x)) {
+        match args.first().map(|x| u16::from_str(x)) {
             Some(Ok(val)) => Ok(val),
             Some(Err(_)) => Err(SshParserError::ExpectedPort),
             None => Err(SshParserError::MissingArgument),
@@ -422,7 +422,7 @@ impl SshConfigParser {
 
     /// Parse unsigned argument
     fn parse_unsigned(args: Vec<String>) -> SshParserResult<usize> {
-        match args.get(0).map(|x| usize::from_str(x)) {
+        match args.first().map(|x| usize::from_str(x)) {
             Some(Ok(val)) => Ok(val),
             Some(Err(_)) => Err(SshParserError::ExpectedUnsigned),
             None => Err(SshParserError::MissingArgument),

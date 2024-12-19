@@ -253,31 +253,31 @@ mod test {
     #[test]
     fn should_merge_params() {
         let mut params = HostParams::default();
-        let mut b = HostParams::default();
-        b.bind_address = Some(String::from("pippo"));
-        b.bind_interface = Some(String::from("tun0"));
-        b.ca_signature_algorithms = Some(vec![]);
-        b.certificate_file = Some(PathBuf::default());
-        b.ciphers = Some(vec![]);
-        b.compression = Some(true);
-        b.connect_timeout = Some(Duration::from_secs(1));
-        b.connection_attempts = Some(3);
-        b.host_key_algorithms = Some(vec![]);
-        b.host_name = Some(String::from("192.168.1.2"));
-        b.identity_file = Some(vec![PathBuf::default()]);
-        b.ignore_unknown = Some(vec![]);
-        b.kex_algorithms = Some(vec![]);
-        b.mac = Some(vec![]);
-        b.port = Some(22);
-        b.pubkey_accepted_algorithms = Some(vec![]);
-        b.pubkey_authentication = Some(true);
-        b.remote_forward = Some(32);
-        b.server_alive_interval = Some(Duration::from_secs(10));
-        #[cfg(target_os = "macos")]
-        {
-            b.use_keychain = Some(true);
-        }
-        b.tcp_keep_alive = Some(true);
+        let mut b = HostParams {
+            bind_address: Some(String::from("pippo")),
+            bind_interface: Some(String::from("tun0")),
+            ca_signature_algorithms: Some(vec![]),
+            certificate_file: Some(PathBuf::default()),
+            ciphers: Some(vec![]),
+            compression: Some(true),
+            connect_timeout: Some(Duration::from_secs(1)),
+            connection_attempts: Some(3),
+            host_key_algorithms: Some(vec![]),
+            host_name: Some(String::from("192.168.1.2")),
+            identity_file: Some(vec![PathBuf::default()]),
+            ignore_unknown: Some(vec![]),
+            kex_algorithms: Some(vec![]),
+            mac: Some(vec![]),
+            port: Some(22),
+            pubkey_accepted_algorithms: Some(vec![]),
+            pubkey_authentication: Some(true),
+            remote_forward: Some(32),
+            server_alive_interval: Some(Duration::from_secs(10)),
+            #[cfg(target_os = "macos")]
+            use_keychain: Some(true),
+            tcp_keep_alive: Some(true),
+            ..Default::default()
+        };
         params.merge(&b);
         assert!(params.bind_address.is_some());
         assert!(params.bind_interface.is_some());
