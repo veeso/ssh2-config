@@ -47,6 +47,7 @@ bitflags! {
         const STRICT = 0b00000000;
         /// Allow unknown field
         const ALLOW_UNKNOWN_FIELDS = 0b00000001;
+        /// Allow unsupported fields
         const ALLOW_UNSUPPORTED_FIELDS = 0b00000010;
     }
 }

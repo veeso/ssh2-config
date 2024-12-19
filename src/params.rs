@@ -169,20 +169,17 @@ impl HostParams {
         if let Some(user) = b.user.as_deref() {
             self.user = Some(user.to_owned());
         }
-        if !b.ignored_fields.is_empty() {
-            for (ignored_field, args) in &b.ignored_fields {
-                if !self.ignored_fields.contains_key(ignored_field) {
-                    self.ignored_fields
-                        .insert(ignored_field.to_owned(), args.to_owned());
-                }
+        for (ignored_field, args) in &b.ignored_fields {
+            if !self.ignored_fields.contains_key(ignored_field) {
+                self.ignored_fields
+                    .insert(ignored_field.to_owned(), args.to_owned());
             }
         }
-        if !b.unsupported_fields.is_empty() {
-            for (unsupported_field, args) in &b.unsupported_fields {
-                if !self.unsupported_fields.contains_key(unsupported_field) {
-                    self.unsupported_fields
-                        .insert(unsupported_field.to_owned(), args.to_owned());
-                }
+
+        for (unsupported_field, args) in &b.unsupported_fields {
+            if !self.unsupported_fields.contains_key(unsupported_field) {
+                self.unsupported_fields
+                    .insert(unsupported_field.to_owned(), args.to_owned());
             }
         }
     }

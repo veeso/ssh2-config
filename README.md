@@ -63,6 +63,7 @@
     - [Exposed attributes](#exposed-attributes)
     - [Missing features](#missing-features)
   - [Get started 🚀](#get-started-)
+    - [Reading unsupported fields](#reading-unsupported-fields)
     - [Examples](#examples)
   - [Support the developer ☕](#support-the-developer-)
   - [Contributing and issues 🤝🏻](#contributing-and-issues-)
@@ -195,7 +196,7 @@ fn auth_with_rsakey(
 
 ### Reading unsupported fields
 
-As outlined above, ssh2-config does not support all parameters available in the man page of the SSH configuration file. 
+As outlined above, ssh2-config does not support all parameters available in the man page of the SSH configuration file.
 
 If you require these fields you may still access them through the `unsupported_fields` field on the `HostParams` structure like this:
 
