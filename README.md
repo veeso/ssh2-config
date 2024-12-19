@@ -63,6 +63,7 @@
     - [Exposed attributes](#exposed-attributes)
     - [Missing features](#missing-features)
   - [Get started 🚀](#get-started-)
+    - [Reading unsupported fields](#reading-unsupported-fields)
     - [Examples](#examples)
   - [Support the developer ☕](#support-the-developer-)
   - [Contributing and issues 🤝🏻](#contributing-and-issues-)
@@ -191,6 +192,25 @@ fn auth_with_rsakey(
     }
 }
 
+```
+
+### Reading unsupported fields
+
+As outlined above, ssh2-config does not support all parameters available in the man page of the SSH configuration file.
+
+If you require these fields you may still access them through the `unsupported_fields` field on the `HostParams` structure like this:
+
+```rust
+use ssh2_config::{ParseRule, SshConfig};
+use std::fs::File;
+use std::io::BufReader;
+
+let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
+
+// Query attributes for a certain host
+let params = config.query("192.168.1.2");
+let forwards = params.unsupported_fields.get("dynamicforward");
 ```
 
 ### Examples

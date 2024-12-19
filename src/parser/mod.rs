@@ -33,6 +33,8 @@ pub enum SshParserError {
     MissingArgument,
     #[error("unknown field: {0}")]
     UnknownField(String, Vec<String>),
+    #[error("unknown field: {0}")]
+    UnsupportedField(String, Vec<String>),
     #[error("IO error: {0}")]
     Io(IoError),
 }
@@ -45,6 +47,8 @@ bitflags! {
         const STRICT = 0b00000000;
         /// Allow unknown field
         const ALLOW_UNKNOWN_FIELDS = 0b00000001;
+        /// Allow unsupported fields
+        const ALLOW_UNSUPPORTED_FIELDS = 0b00000010;
     }
 }
 
@@ -113,7 +117,21 @@ impl SshConfigParser {
                 current_host = config.hosts.last_mut().unwrap();
             } else {
                 // Update field
-                Self::update_host(field, args, &mut current_host.params)?;
+                match Self::update_host(field, args, &mut current_host.params) {
+                    Ok(()) => Ok(()),
+                    // If we're allowing unsupported fields to be parsed, add them to the map
+                    Err(SshParserError::UnsupportedField(field, args))
+                        if rules.intersects(ParseRule::ALLOW_UNSUPPORTED_FIELDS) =>
+                    {
+                        current_host.params.unsupported_fields.insert(field, args);
+                        Ok(())
+                    }
+                    // Eat the error here to not break the API with this change
+                    // Also it'd be weird to error on correct ssh_config's just because they're
+                    // not supported by this library
+                    Err(SshParserError::UnsupportedField(_, _)) => Ok(()),
+                    e => e,
+                }?;
             }
         }
 
@@ -275,7 +293,9 @@ impl SshConfigParser {
             | Field::UserKnownHostsFile
             | Field::VerifyHostKeyDNS
             | Field::VisualHostKey
-            | Field::XAuthLocation => { /* Ignore fields */ }
+            | Field::XAuthLocation => {
+                return Err(SshParserError::UnsupportedField(field.to_string(), args))
+            }
         }
         Ok(())
     }
@@ -881,11 +901,38 @@ mod test {
     #[test]
     fn should_not_update_host_if_unknown() -> Result<(), SshParserError> {
         let mut params = HostParams::default();
-        SshConfigParser::update_host(
+        let result = SshConfigParser::update_host(
             Field::AddKeysToAgent,
             vec![String::from("yes")],
             &mut params,
-        )?;
+        );
+
+        match result {
+            Ok(()) | Err(SshParserError::UnsupportedField(_, _)) => Ok(()),
+            e => e,
+        }?;
+
+        assert_eq!(params, HostParams::default());
+        Ok(())
+    }
+
+    #[test]
+    fn should_update_host_if_unsupported() -> Result<(), SshParserError> {
+        let mut params = HostParams::default();
+        let result = SshConfigParser::update_host(
+            Field::AddKeysToAgent,
+            vec![String::from("yes")],
+            &mut params,
+        );
+
+        match result {
+            Err(SshParserError::UnsupportedField(field, _)) => {
+                assert_eq!(field, "addkeystoagent");
+                Ok(())
+            }
+            e => e,
+        }?;
+
         assert_eq!(params, HostParams::default());
         Ok(())
     }
