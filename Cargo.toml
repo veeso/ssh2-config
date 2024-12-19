@@ -18,7 +18,7 @@ version = "0.2.3"
 [dependencies]
 bitflags = "^2"
 dirs = "^5"
-thiserror = "^1"
+thiserror = "^2"
 wildmatch = "^2.1"
 
 [dev-dependencies]
