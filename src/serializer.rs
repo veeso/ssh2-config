@@ -1,0 +1,211 @@
+//! SSH Config serializer
+
+use std::fmt;
+
+use crate::{Host, HostParams, SshConfig};
+
+pub struct SshConfigSerializer<'a>(&'a SshConfig);
+
+impl SshConfigSerializer<'_> {
+    pub fn serialize(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0.hosts.is_empty() {
+            return Ok(());
+        }
+
+        // serialize default host
+        let root = self.0.hosts.first().unwrap();
+        Self::serialize_host_params(f, &root.params, false)?;
+
+        // serialize other hosts
+        for host in self.0.hosts.iter().skip(1) {
+            Self::serialize_host(f, host)?;
+        }
+
+        Ok(())
+    }
+
+    fn serialize_host(f: &mut fmt::Formatter<'_>, host: &Host) -> fmt::Result {
+        for pattern in &host.pattern {
+            writeln!(f, "Host {pattern}",)?;
+
+            Self::serialize_host_params(f, &host.params, true)?;
+            writeln!(f,)?;
+        }
+
+        Ok(())
+    }
+
+    fn serialize_host_params(
+        f: &mut fmt::Formatter<'_>,
+        params: &HostParams,
+        nested: bool,
+    ) -> fmt::Result {
+        let padding = if nested { "    " } else { "" };
+
+        if let Some(value) = params.bind_address.as_ref() {
+            writeln!(f, "{padding}Hostname {value}",)?;
+        }
+        if let Some(value) = params.bind_interface.as_ref() {
+            writeln!(f, "{padding}BindAddress {value}",)?;
+        }
+        if let Some(ca_signature_algorithms) = params.ca_signature_algorithms.as_ref() {
+            writeln!(
+                f,
+                "{padding}CASignatureAlgorithms {ca_signature_algorithms}",
+                padding = padding,
+                ca_signature_algorithms = ca_signature_algorithms.join(" ")
+            )?;
+        }
+        if let Some(certificate_file) = params.certificate_file.as_ref() {
+            writeln!(f, "{padding}CertificateFile {}", certificate_file.display())?;
+        }
+        if let Some(ciphers) = params.ciphers.as_ref() {
+            writeln!(
+                f,
+                "{padding}Ciphers {ciphers}",
+                padding = padding,
+                ciphers = ciphers.join(",")
+            )?;
+        }
+        if let Some(value) = params.compression.as_ref() {
+            writeln!(
+                f,
+                "{padding}Compression {}",
+                if *value { "yes" } else { "no" }
+            )?;
+        }
+        if let Some(connection_attempts) = params.connection_attempts {
+            writeln!(f, "{padding}ConnectionAttempts {connection_attempts}",)?;
+        }
+        if let Some(connect_timeout) = params.connect_timeout {
+            writeln!(f, "{padding}ConnectTimeout {}", connect_timeout.as_secs())?;
+        }
+        if let Some(host_key_algorithms) = params.host_key_algorithms.as_ref() {
+            writeln!(
+                f,
+                "{padding}HostKeyAlgorithms {host_key_algorithms}",
+                padding = padding,
+                host_key_algorithms = host_key_algorithms.join(",")
+            )?;
+        }
+        if let Some(host_name) = params.host_name.as_ref() {
+            writeln!(f, "{padding}HostName {host_name}",)?;
+        }
+        if let Some(identity_file) = params.identity_file.as_ref() {
+            writeln!(
+                f,
+                "{padding}IdentityFile {}",
+                identity_file
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )?;
+        }
+        if let Some(ignore_unknown) = params.ignore_unknown.as_ref() {
+            writeln!(
+                f,
+                "{padding}IgnoreUnknown {}",
+                ignore_unknown
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )?;
+        }
+        if let Some(kex_algorithms) = params.kex_algorithms.as_ref() {
+            writeln!(
+                f,
+                "{padding}KexAlgorithms {kex_algorithms}",
+                padding = padding,
+                kex_algorithms = kex_algorithms.join(",")
+            )?;
+        }
+        if let Some(mac) = params.mac.as_ref() {
+            writeln!(
+                f,
+                "{padding}MACs {mac}",
+                padding = padding,
+                mac = mac.join(",")
+            )?;
+        }
+        if let Some(port) = params.port {
+            writeln!(f, "{padding}Port {port}", port = port)?;
+        }
+        if let Some(pubkey_accepted_algorithms) = params.pubkey_accepted_algorithms.as_ref() {
+            writeln!(
+                f,
+                "{padding}PubkeyAcceptedAlgorithms {pubkey_accepted_algorithms}",
+                padding = padding,
+                pubkey_accepted_algorithms = pubkey_accepted_algorithms.join(",")
+            )?;
+        }
+        if let Some(pubkey_authentication) = params.pubkey_authentication.as_ref() {
+            writeln!(
+                f,
+                "{padding}PubkeyAuthentication {}",
+                if *pubkey_authentication { "yes" } else { "no" }
+            )?;
+        }
+        if let Some(remote_forward) = params.remote_forward.as_ref() {
+            writeln!(f, "{padding}RemoteForward {remote_forward}",)?;
+        }
+        if let Some(server_alive_interval) = params.server_alive_interval {
+            writeln!(
+                f,
+                "{padding}ServerAliveInterval {}",
+                server_alive_interval.as_secs()
+            )?;
+        }
+        if let Some(tcp_keep_alive) = params.tcp_keep_alive.as_ref() {
+            writeln!(
+                f,
+                "{padding}TCPKeepAlive {}",
+                if *tcp_keep_alive { "yes" } else { "no" }
+            )?;
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(use_keychain) = params.use_keychain.as_ref() {
+            writeln!(
+                f,
+                "{padding}UseKeychain {}",
+                if *use_keychain { "yes" } else { "no" }
+            )?;
+        }
+        if let Some(user) = params.user.as_ref() {
+            writeln!(f, "{padding}User {user}",)?;
+        }
+        for (field, value) in &params.ignored_fields {
+            writeln!(
+                f,
+                "{padding}{field} {value}",
+                field = field,
+                value = value
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )?;
+        }
+        for (field, value) in &params.unsupported_fields {
+            writeln!(
+                f,
+                "{padding}{field} {value}",
+                field = field,
+                value = value
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            )?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> From<&'a SshConfig> for SshConfigSerializer<'a> {
+    fn from(config: &'a SshConfig) -> Self {
+        SshConfigSerializer(config)
+    }
+}

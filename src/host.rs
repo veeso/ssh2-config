@@ -2,6 +2,8 @@
 //!
 //! Ssh host type
 
+use std::fmt;
+
 use wildmatch::WildMatch;
 
 use super::HostParams;
@@ -39,6 +41,16 @@ impl Host {
 pub struct HostClause {
     pub pattern: String,
     pub negated: bool,
+}
+
+impl fmt::Display for HostClause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.negated {
+            write!(f, "!{}", self.pattern)
+        } else {
+            write!(f, "{}", self.pattern)
+        }
+    }
 }
 
 impl HostClause {

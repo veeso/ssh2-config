@@ -25,6 +25,7 @@ Released on 15/03/2025
 - Fixed ordering in appliance of options. **It's always top-bottom**.
 - Added logging to parser. You can now disable logging by using `nolog` feature.
 - `parse_default_file` is now available to Windows users
+- Added `Display` and `ToString` traits for `SshConfig` which serializes the configuration into ssh2 format
 
 ## 0.3.0
 

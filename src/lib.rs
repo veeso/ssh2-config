@@ -47,6 +47,11 @@
 //! // If there's no rule for your host, default params are returned
 //! let params = config.query("192.168.1.2");
 //!
+//! // ...
+//!
+//! // serialize configuration to string
+//! let s = config.to_string();
+//!
 //! ```
 //!
 
@@ -55,6 +60,7 @@
 #[macro_use]
 extern crate log;
 
+use std::fmt;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::PathBuf;
@@ -63,6 +69,7 @@ use std::time::Duration;
 mod host;
 mod params;
 mod parser;
+mod serializer;
 
 // -- export
 pub use host::{Host, HostClause};
@@ -76,6 +83,12 @@ pub struct SshConfig {
     /// Rulesets for hosts.
     /// Default config will be stored with key `*`
     hosts: Vec<Host>,
+}
+
+impl fmt::Display for SshConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        serializer::SshConfigSerializer::from(self).serialize(f)
+    }
 }
 
 impl SshConfig {

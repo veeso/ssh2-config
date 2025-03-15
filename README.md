@@ -19,7 +19,7 @@
   /></a>
   <a href="https://github.com/veeso/ssh2-config/stargazers"
     ><img
-      src="https://img.shields.io/github/stars/veeso/ssh2-config.svg"
+      src="https://img.shields.io/github/stars/veeso/ssh2-config.svg?style=flat&logo=github"
       alt="Repo stars"
   /></a>
   <a href="https://crates.io/crates/ssh2-config"

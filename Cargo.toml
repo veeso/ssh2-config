@@ -41,3 +41,7 @@ path = "examples/client.rs"
 [[example]]
 name = "query"
 path = "examples/query.rs"
+
+[[example]]
+name = "print"
+path = "examples/print.rs"
