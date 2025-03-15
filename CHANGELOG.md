@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.4.0](#040)
   - [0.3.0](#030)
   - [0.2.3](#023)
   - [0.2.2](#022)
@@ -15,6 +16,14 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.4.0
+
+Released on 15/03/2025
+
+- Added support for `Include` directive. <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Include>
+- Fixed ordering in appliance of options. **It's always top-bottom**.
+- Added logging to parser. You can now disable logging by using `nolog` feature.
 
 ## 0.3.0
 

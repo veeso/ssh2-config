@@ -105,6 +105,10 @@ impl HostParams {
         if let Some(connection_attempts) = b.connection_attempts {
             self.connection_attempts = Some(connection_attempts);
         }
+        trace!(
+            "wait comparing connect timeout: {:?} {:?}",
+            self.connect_timeout, b.connect_timeout
+        );
         if let Some(connect_timeout) = b.connect_timeout {
             self.connect_timeout = Some(connect_timeout);
         }

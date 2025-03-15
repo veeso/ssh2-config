@@ -21,7 +21,7 @@
 //! First of you need to add **ssh2-config** to your project dependencies:
 //!
 //! ```toml
-//! ssh2-config = "^0.2.0"
+//! ssh2-config = "^0.4"
 //! ```
 //!
 //! ## Example
@@ -52,6 +52,9 @@
 
 #![doc(html_playground_url = "https://play.rust-lang.org")]
 
+#[macro_use]
+extern crate log;
+
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::path::PathBuf;
@@ -80,7 +83,7 @@ impl SshConfig {
     pub fn query<S: AsRef<str>>(&self, host: S) -> HostParams {
         let mut params = HostParams::default();
         // iter keys, merge from lowest to highest precedence
-        for cfg_host in self.hosts.iter().rev() {
+        for cfg_host in self.hosts.iter() {
             if cfg_host.intersects(host.as_ref()) {
                 params.merge(&cfg_host.params);
             }
@@ -118,6 +121,20 @@ impl SshConfig {
 }
 
 #[cfg(test)]
+fn test_log() {
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    INIT.call_once(|| {
+        let _ = env_logger::builder()
+            .filter_level(log::LevelFilter::Trace)
+            .is_test(true)
+            .try_init();
+    });
+}
+
+#[cfg(test)]
 mod test {
 
     use pretty_assertions::assert_eq;
@@ -126,6 +143,8 @@ mod test {
 
     #[test]
     fn should_init_ssh_config() {
+        test_log();
+
         let config = SshConfig::default();
         assert_eq!(config.hosts.len(), 0);
         assert_eq!(config.query("192.168.1.2"), HostParams::default());
@@ -134,12 +153,16 @@ mod test {
     #[test]
     #[cfg(target_family = "unix")]
     fn should_parse_default_config() -> Result<(), parser::SshParserError> {
+        test_log();
+
         let _config = SshConfig::parse_default_file(ParseRule::ALLOW_UNKNOWN_FIELDS)?;
         Ok(())
     }
 
     #[test]
     fn should_parse_config() -> Result<(), parser::SshParserError> {
+        test_log();
+
         use std::fs::File;
         use std::io::BufReader;
         use std::path::Path;
@@ -156,6 +179,8 @@ mod test {
 
     #[test]
     fn should_query_ssh_config() {
+        test_log();
+
         let mut config = SshConfig::default();
         // add config
         let mut params1 = HostParams {

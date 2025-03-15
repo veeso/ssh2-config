@@ -2,12 +2,14 @@
 //!
 //! Ssh config parser
 
-use std::io::{BufRead, Error as IoError};
+use std::fs::File;
+use std::io::{BufRead, BufReader, Error as IoError};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
 use bitflags::bitflags;
+use glob::glob;
 use thiserror::Error;
 
 use super::{Host, HostClause, HostParams, SshConfig};
@@ -29,14 +31,18 @@ pub enum SshParserError {
     ExpectedUnsigned,
     #[error("expected path")]
     ExpectedPath,
+    #[error("IO error: {0}")]
+    Io(#[from] IoError),
+    #[error("glob error: {0}")]
+    Glob(#[from] glob::GlobError),
     #[error("missing argument")]
     MissingArgument,
+    #[error("pattern error: {0}")]
+    PatternError(#[from] glob::PatternError),
     #[error("unknown field: {0}")]
     UnknownField(String, Vec<String>),
     #[error("unknown field: {0}")]
     UnsupportedField(String, Vec<String>),
-    #[error("IO error: {0}")]
-    Io(IoError),
 }
 
 bitflags! {
@@ -99,7 +105,7 @@ impl SshConfigParser {
                     continue;
                 }
                 Err(SshParserError::UnknownField(field, args)) => {
-                    return Err(SshParserError::UnknownField(field, args))
+                    return Err(SshParserError::UnknownField(field, args));
                 }
                 Err(err) => return Err(err),
             };
@@ -108,16 +114,21 @@ impl SshConfigParser {
                 // Pass `ignore_unknown` from global overrides down into the tokenizer.
                 let mut params = HostParams::default();
                 params.ignore_unknown = config.hosts[0].params.ignore_unknown.clone();
+                let pattern = Self::parse_host(args)?;
+                trace!("Adding new host: {pattern:?}",);
 
-                // Add a new host
-                config
-                    .hosts
-                    .push(Host::new(Self::parse_host(args)?, params));
-                // Update current host pointer
-                current_host = config.hosts.last_mut().unwrap();
+                // check if host already exists
+                if let Some(existing) = config.hosts.iter_mut().find(|x| x.pattern == pattern) {
+                    current_host = existing;
+                } else {
+                    // Add a new host
+                    config.hosts.push(Host::new(pattern, params));
+                    // Update current host pointer
+                    current_host = config.hosts.last_mut().unwrap();
+                }
             } else {
                 // Update field
-                match Self::update_host(field, args, &mut current_host.params) {
+                match Self::update_host(field, args, current_host, rules) {
                     Ok(()) => Ok(()),
                     // If we're allowing unsupported fields to be parsed, add them to the map
                     Err(SshParserError::UnsupportedField(field, args))
@@ -151,76 +162,126 @@ impl SshConfigParser {
     fn update_host(
         field: Field,
         args: Vec<String>,
-        params: &mut HostParams,
+        host: &mut Host,
+        rules: ParseRule,
     ) -> SshParserResult<()> {
+        trace!("parsing field {field:?} with args {args:?}",);
+        let params = &mut host.params;
         match field {
             Field::BindAddress => {
-                params.bind_address = Some(Self::parse_string(args)?);
+                let value = Self::parse_string(args)?;
+                trace!("bind_address: {value}",);
+                params.bind_address = Some(value);
             }
             Field::BindInterface => {
-                params.bind_interface = Some(Self::parse_string(args)?);
+                let value = Self::parse_string(args)?;
+                trace!("bind_interface: {value}",);
+                params.bind_interface = Some(value);
             }
             Field::CaSignatureAlgorithms => {
-                params.ca_signature_algorithms = Some(Self::parse_comma_separated_list(args)?);
+                let value = Self::parse_comma_separated_list(args)?;
+                trace!("ca_signature_algorithms: {value:?}",);
+                params.ca_signature_algorithms = Some(value);
             }
             Field::CertificateFile => {
-                params.certificate_file = Some(Self::parse_path(args)?);
+                let value = Self::parse_path(args)?;
+                trace!("certificate_file: {value:?}",);
+                params.certificate_file = Some(value);
             }
             Field::Ciphers => {
-                params.ciphers = Some(Self::parse_comma_separated_list(args)?);
+                let value = Self::parse_comma_separated_list(args)?;
+                trace!("ciphers: {value:?}",);
+                params.ciphers = Some(value);
             }
             Field::Compression => {
-                params.compression = Some(Self::parse_boolean(args)?);
+                let value = Self::parse_boolean(args)?;
+                trace!("compression: {value}",);
+                params.compression = Some(value);
             }
             Field::ConnectTimeout => {
-                params.connect_timeout = Some(Self::parse_duration(args)?);
+                let value = Self::parse_duration(args)?;
+                trace!("connect_timeout: {value:?}",);
+                params.connect_timeout = Some(value);
             }
             Field::ConnectionAttempts => {
-                params.connection_attempts = Some(Self::parse_unsigned(args)?);
+                let value = Self::parse_unsigned(args)?;
+                trace!("connection_attempts: {value}",);
+                params.connection_attempts = Some(value);
             }
             Field::Host => { /* already handled before */ }
             Field::HostKeyAlgorithms => {
-                params.host_key_algorithms = Some(Self::parse_comma_separated_list(args)?);
+                let value = Self::parse_comma_separated_list(args)?;
+                trace!("host_key_algorithm: {value:?}",);
+                params.host_key_algorithms = Some(value);
             }
             Field::HostName => {
-                params.host_name = Some(Self::parse_string(args)?);
+                let value = Self::parse_string(args)?;
+                trace!("host_name: {value}",);
+                params.host_name = Some(value);
+            }
+            Field::Include => {
+                Self::include_files(args, host, rules)?;
             }
             Field::IdentityFile => {
-                params.identity_file = Some(Self::parse_path_list(args)?);
+                let value = Self::parse_path_list(args)?;
+                trace!("identity_file: {value:?}",);
+                params.identity_file = Some(value);
             }
             Field::IgnoreUnknown => {
-                params.ignore_unknown = Some(Self::parse_comma_separated_list(args)?);
+                let value = Self::parse_comma_separated_list(args)?;
+                trace!("ignore_unknown: {value:?}",);
+                params.ignore_unknown = Some(value);
             }
             Field::KexAlgorithms => {
-                params.kex_algorithms = Some(Self::parse_comma_separated_list(args)?);
+                let value = Self::parse_comma_separated_list(args)?;
+                trace!("kex_algorithms: {value:?}",);
+                params.kex_algorithms = Some(value);
             }
             Field::Mac => {
-                params.mac = Some(Self::parse_comma_separated_list(args)?);
+                let value = Self::parse_comma_separated_list(args)?;
+                trace!("mac: {value:?}",);
+                params.mac = Some(value);
             }
             Field::Port => {
-                params.port = Some(Self::parse_port(args)?);
+                let value = Self::parse_port(args)?;
+                trace!("port: {value}",);
+                params.port = Some(value);
             }
             Field::PubkeyAcceptedAlgorithms => {
-                params.pubkey_accepted_algorithms = Some(Self::parse_comma_separated_list(args)?);
+                let value = Self::parse_comma_separated_list(args)?;
+                trace!("pubkey_accepted_algorithms: {value:?}",);
+                params.pubkey_accepted_algorithms = Some(value);
             }
             Field::PubkeyAuthentication => {
-                params.pubkey_authentication = Some(Self::parse_boolean(args)?);
+                let value = Self::parse_boolean(args)?;
+                trace!("pubkey_authentication: {value}",);
+                params.pubkey_authentication = Some(value);
             }
             Field::RemoteForward => {
-                params.remote_forward = Some(Self::parse_port(args)?);
+                let value = Self::parse_port(args)?;
+                trace!("remote_forward: {value}",);
+                params.remote_forward = Some(value);
             }
             Field::ServerAliveInterval => {
-                params.server_alive_interval = Some(Self::parse_duration(args)?);
+                let value = Self::parse_duration(args)?;
+                trace!("server_alive_interval: {value:?}",);
+                params.server_alive_interval = Some(value);
             }
             Field::TcpKeepAlive => {
-                params.tcp_keep_alive = Some(Self::parse_boolean(args)?);
+                let value = Self::parse_boolean(args)?;
+                trace!("tcp_keep_alive: {value}",);
+                params.tcp_keep_alive = Some(value);
             }
             #[cfg(target_os = "macos")]
             Field::UseKeychain => {
-                params.use_keychain = Some(Self::parse_boolean(args)?);
+                let value = Self::parse_boolean(args)?;
+                trace!("use_keychain: {value}",);
+                params.use_keychain = Some(value);
             }
             Field::User => {
-                params.user = Some(Self::parse_string(args)?);
+                let value = Self::parse_string(args)?;
+                trace!("user: {value}",);
+                params.user = Some(value);
             }
             // -- unimplemented fields
             Field::AddKeysToAgent
@@ -257,7 +318,6 @@ impl SshConfigParser {
             | Field::HostbasedKeyTypes
             | Field::IdentitiesOnly
             | Field::IdentityAgent
-            | Field::Include
             | Field::IPQoS
             | Field::KbdInteractiveAuthentication
             | Field::KbdInteractiveDevices
@@ -294,9 +354,37 @@ impl SshConfigParser {
             | Field::VerifyHostKeyDNS
             | Field::VisualHostKey
             | Field::XAuthLocation => {
-                return Err(SshParserError::UnsupportedField(field.to_string(), args))
+                return Err(SshParserError::UnsupportedField(field.to_string(), args));
             }
         }
+        Ok(())
+    }
+
+    /// include a file by parsing it and updating host rules by merging the read config to the current one for the host
+    fn include_files(args: Vec<String>, host: &mut Host, rules: ParseRule) -> SshParserResult<()> {
+        let path_match = Self::parse_string(args)?;
+        trace!("include files: {path_match}",);
+        let files = glob(&path_match)?;
+
+        for file in files {
+            let file = file?;
+            trace!("including file: {}", file.display());
+            let mut reader = BufReader::new(File::open(file)?);
+            let mut sub_config = SshConfig::default();
+            Self::parse(&mut sub_config, &mut reader, rules)?;
+
+            // merge sub-config into host
+            for pattern in &host.pattern {
+                if pattern.negated {
+                    trace!("excluding sub-config for pattern: {pattern:?}",);
+                    continue;
+                }
+                trace!("merging sub-config for pattern: {pattern:?}",);
+                let params = sub_config.query(&pattern.pattern);
+                host.params.merge(&params);
+            }
+        }
+
         Ok(())
     }
 
@@ -309,7 +397,7 @@ impl SshConfigParser {
                 return Err(SshParserError::UnknownField(
                     field,
                     tokens.map(|x| x.to_string()).collect(),
-                ))
+                ));
             }
             None => return Err(SshParserError::MissingArgument),
         };
@@ -444,6 +532,7 @@ mod test {
 
     #[test]
     fn should_parse_configuration() -> Result<(), SshParserError> {
+        crate::test_log();
         let temp = create_ssh_config();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
@@ -508,11 +597,11 @@ mod test {
         assert_eq!(
             params.ciphers.as_deref().unwrap(),
             &[
+                "a-manella",
+                "blowfish",
                 "coi-piedi",
                 "cazdecan",
                 "triestin-stretto",
-                "a-manella",
-                "blowfish",
             ]
         );
         assert_eq!(params.mac.as_deref().unwrap(), &["spyro", "deoxys"]);
@@ -534,7 +623,7 @@ mod test {
 
         // Query tostapane
         let params = config.query("tostapane");
-        assert_eq!(params.compression.unwrap(), true); // cmdline override over host-specific option
+        assert_eq!(params.compression.unwrap(), false);
         assert_eq!(params.connection_attempts.unwrap(), 10);
         assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
         assert_eq!(params.tcp_keep_alive.unwrap(), true);
@@ -589,6 +678,7 @@ mod test {
 
     #[test]
     fn should_allow_unknown_field() -> Result<(), SshParserError> {
+        crate::test_log();
         let temp = create_ssh_config_with_unknown_fields();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
@@ -599,6 +689,7 @@ mod test {
 
     #[test]
     fn should_not_allow_unknown_field() {
+        crate::test_log();
         let temp = create_ssh_config_with_unknown_fields();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
@@ -612,6 +703,7 @@ mod test {
 
     #[test]
     fn should_store_unknown_fields() {
+        crate::test_log();
         let temp = create_ssh_config_with_unknown_fields();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
@@ -628,6 +720,7 @@ mod test {
 
     #[test]
     fn should_parse_inversed_ssh_config() {
+        crate::test_log();
         let temp = create_inverted_ssh_config();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
@@ -645,7 +738,7 @@ mod test {
         // From `*-host`
         assert_eq!(
             host_params.identity_file.unwrap()[0].as_path(),
-            Path::new(format!("{home_dir}/.ssh/id_rsa_good").as_str())
+            Path::new(format!("{home_dir}/.ssh/id_rsa_bad").as_str())
         );
 
         // From `remote-*`
@@ -661,6 +754,7 @@ mod test {
 
     #[test]
     fn should_parse_configuration_with_hosts() {
+        crate::test_log();
         let temp = create_ssh_config_with_comments();
 
         let file = File::open(temp.path()).expect("Failed to open tempfile");
@@ -677,34 +771,44 @@ mod test {
 
     #[test]
     fn should_update_host_bind_address() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::BindAddress,
             vec![String::from("127.0.0.1")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(params.bind_address.as_deref().unwrap(), "127.0.0.1");
+        assert_eq!(host.params.bind_address.as_deref().unwrap(), "127.0.0.1");
         Ok(())
     }
 
     #[test]
     fn should_update_host_bind_interface() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::BindInterface, vec![String::from("aaa")], &mut params)?;
-        assert_eq!(params.bind_interface.as_deref().unwrap(), "aaa");
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::BindInterface,
+            vec![String::from("aaa")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(host.params.bind_interface.as_deref().unwrap(), "aaa");
         Ok(())
     }
 
     #[test]
     fn should_update_host_ca_signature_algos() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::CaSignatureAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            params.ca_signature_algorithms.as_deref().unwrap(),
+            host.params.ca_signature_algorithms.as_deref().unwrap(),
             &["a", "b", "c"]
         );
         Ok(())
@@ -712,14 +816,16 @@ mod test {
 
     #[test]
     fn should_update_host_certificate_file() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::CertificateFile,
             vec![String::from("/tmp/a.crt")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            params.certificate_file.as_deref().unwrap(),
+            host.params.certificate_file.as_deref().unwrap(),
             Path::new("/tmp/a.crt")
         );
         Ok(())
@@ -727,50 +833,75 @@ mod test {
 
     #[test]
     fn should_update_host_ciphers() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::Ciphers, vec![String::from("a,b,c")], &mut params)?;
-        assert_eq!(params.ciphers.as_deref().unwrap(), &["a", "b", "c"]);
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::Ciphers,
+            vec![String::from("a,b,c")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(host.params.ciphers.as_deref().unwrap(), &["a", "b", "c"]);
         Ok(())
     }
 
     #[test]
     fn should_update_host_compression() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::Compression, vec![String::from("yes")], &mut params)?;
-        assert_eq!(params.compression.unwrap(), true);
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::Compression,
+            vec![String::from("yes")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(host.params.compression.unwrap(), true);
         Ok(())
     }
 
     #[test]
     fn should_update_host_connection_attempts() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::ConnectionAttempts,
             vec![String::from("4")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(params.connection_attempts.unwrap(), 4);
+        assert_eq!(host.params.connection_attempts.unwrap(), 4);
         Ok(())
     }
 
     #[test]
     fn should_update_host_connection_timeout() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::ConnectTimeout, vec![String::from("10")], &mut params)?;
-        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(10));
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::ConnectTimeout,
+            vec![String::from("10")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(
+            host.params.connect_timeout.unwrap(),
+            Duration::from_secs(10)
+        );
         Ok(())
     }
 
     #[test]
     fn should_update_host_key_algorithms() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::HostKeyAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            params.host_key_algorithms.as_deref().unwrap(),
+            host.params.host_key_algorithms.as_deref().unwrap(),
             &["a", "b", "c"]
         );
         Ok(())
@@ -778,66 +909,92 @@ mod test {
 
     #[test]
     fn should_update_host_host_name() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::HostName,
             vec![String::from("192.168.1.1")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(params.host_name.as_deref().unwrap(), "192.168.1.1");
+        assert_eq!(host.params.host_name.as_deref().unwrap(), "192.168.1.1");
         Ok(())
     }
 
     #[test]
     fn should_update_host_ignore_unknown() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::IgnoreUnknown,
             vec![String::from("a,b,c")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(params.ignore_unknown.as_deref().unwrap(), &["a", "b", "c"]);
+        assert_eq!(
+            host.params.ignore_unknown.as_deref().unwrap(),
+            &["a", "b", "c"]
+        );
         Ok(())
     }
 
     #[test]
     fn should_update_kex_algorithms() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::KexAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(params.kex_algorithms.as_deref().unwrap(), &["a", "b", "c"]);
+        assert_eq!(
+            host.params.kex_algorithms.as_deref().unwrap(),
+            &["a", "b", "c"]
+        );
         Ok(())
     }
 
     #[test]
     fn should_update_host_mac() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::Mac, vec![String::from("a,b,c")], &mut params)?;
-        assert_eq!(params.mac.as_deref().unwrap(), &["a", "b", "c"]);
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::Mac,
+            vec![String::from("a,b,c")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(host.params.mac.as_deref().unwrap(), &["a", "b", "c"]);
         Ok(())
     }
 
     #[test]
     fn should_update_host_port() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::Port, vec![String::from("2222")], &mut params)?;
-        assert_eq!(params.port.unwrap(), 2222);
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::Port,
+            vec![String::from("2222")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(host.params.port.unwrap(), 2222);
         Ok(())
     }
 
     #[test]
     fn should_update_host_pubkey_accepted_algos() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::PubkeyAcceptedAlgorithms,
             vec![String::from("a,b,c")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            host.params.pubkey_accepted_algorithms.as_deref().unwrap(),
             &["a", "b", "c"]
         );
         Ok(())
@@ -845,38 +1002,44 @@ mod test {
 
     #[test]
     fn should_update_host_pubkey_authentication() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::PubkeyAuthentication,
             vec![String::from("yes")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(params.pubkey_authentication.unwrap(), true);
+        assert_eq!(host.params.pubkey_authentication.unwrap(), true);
         Ok(())
     }
 
     #[test]
     fn should_update_host_remote_forward() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::RemoteForward,
             vec![String::from("3005")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(params.remote_forward.unwrap(), 3005);
+        assert_eq!(host.params.remote_forward.unwrap(), 3005);
         Ok(())
     }
 
     #[test]
     fn should_update_host_server_alive_interval() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         SshConfigParser::update_host(
             Field::ServerAliveInterval,
             vec![String::from("40")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            params.server_alive_interval.unwrap(),
+            host.params.server_alive_interval.unwrap(),
             Duration::from_secs(40)
         );
         Ok(())
@@ -884,27 +1047,41 @@ mod test {
 
     #[test]
     fn should_update_host_tcp_keep_alive() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::TcpKeepAlive, vec![String::from("no")], &mut params)?;
-        assert_eq!(params.tcp_keep_alive.unwrap(), false);
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::TcpKeepAlive,
+            vec![String::from("no")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(host.params.tcp_keep_alive.unwrap(), false);
         Ok(())
     }
 
     #[test]
     fn should_update_host_user() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
-        SshConfigParser::update_host(Field::User, vec![String::from("pippo")], &mut params)?;
-        assert_eq!(params.user.as_deref().unwrap(), "pippo");
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
+        SshConfigParser::update_host(
+            Field::User,
+            vec![String::from("pippo")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+        )?;
+        assert_eq!(host.params.user.as_deref().unwrap(), "pippo");
         Ok(())
     }
 
     #[test]
     fn should_not_update_host_if_unknown() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         let result = SshConfigParser::update_host(
             Field::AddKeysToAgent,
             vec![String::from("yes")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         );
 
         match result {
@@ -912,17 +1089,19 @@ mod test {
             e => e,
         }?;
 
-        assert_eq!(params, HostParams::default());
+        assert_eq!(host.params, HostParams::default());
         Ok(())
     }
 
     #[test]
     fn should_update_host_if_unsupported() -> Result<(), SshParserError> {
-        let mut params = HostParams::default();
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::default());
         let result = SshConfigParser::update_host(
             Field::AddKeysToAgent,
             vec![String::from("yes")],
-            &mut params,
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
         );
 
         match result {
@@ -933,12 +1112,13 @@ mod test {
             e => e,
         }?;
 
-        assert_eq!(params, HostParams::default());
+        assert_eq!(host.params, HostParams::default());
         Ok(())
     }
 
     #[test]
     fn should_tokenize_line() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::tokenize("HostName 192.168.*.* 172.26.*.*")?,
             (
@@ -961,6 +1141,7 @@ mod test {
 
     #[test]
     fn should_not_tokenize_line() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::tokenize("Omar     yes").unwrap_err(),
             SshParserError::UnknownField(..)
@@ -969,6 +1150,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_field() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::tokenize("                  ").unwrap_err(),
             SshParserError::MissingArgument
@@ -977,6 +1159,7 @@ mod test {
 
     #[test]
     fn should_parse_boolean() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_boolean(vec![String::from("yes")])?,
             true
@@ -990,6 +1173,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_boolean() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_boolean(vec!["boh".to_string()]).unwrap_err(),
             SshParserError::ExpectedBoolean
@@ -1002,6 +1186,7 @@ mod test {
 
     #[test]
     fn should_parse_comma_separated_list() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_comma_separated_list(vec![String::from("a,b,c,d")])?,
             vec![
@@ -1020,6 +1205,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_comma_separated_list() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_comma_separated_list(vec![]).unwrap_err(),
             SshParserError::MissingArgument
@@ -1028,6 +1214,7 @@ mod test {
 
     #[test]
     fn should_parse_duration() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_duration(vec![String::from("60")])?,
             Duration::from_secs(60)
@@ -1037,6 +1224,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_duration() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_duration(vec![String::from("AAA")]).unwrap_err(),
             SshParserError::ExpectedUnsigned
@@ -1049,6 +1237,7 @@ mod test {
 
     #[test]
     fn should_parse_host() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_host(vec![
                 String::from("192.168.*.*"),
@@ -1068,6 +1257,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_host() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_host(vec![]).unwrap_err(),
             SshParserError::MissingArgument
@@ -1076,6 +1266,7 @@ mod test {
 
     #[test]
     fn should_parse_path() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_path(vec![String::from("/tmp/a.txt")])?,
             PathBuf::from("/tmp/a.txt")
@@ -1085,6 +1276,7 @@ mod test {
 
     #[test]
     fn should_parse_path_and_resolve_tilde() -> Result<(), SshParserError> {
+        crate::test_log();
         let mut expected = dirs::home_dir().unwrap();
         expected.push(".ssh/id_dsa");
         assert_eq!(
@@ -1096,6 +1288,7 @@ mod test {
 
     #[test]
     fn should_parse_path_list() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_path_list(vec![
                 String::from("/tmp/a.txt"),
@@ -1108,6 +1301,7 @@ mod test {
 
     #[test]
     fn should_fail_parse_path_list() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_path_list(vec![]).unwrap_err(),
             SshParserError::MissingArgument
@@ -1116,6 +1310,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_path() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_path(vec![]).unwrap_err(),
             SshParserError::MissingArgument
@@ -1124,12 +1319,14 @@ mod test {
 
     #[test]
     fn should_parse_port() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(SshConfigParser::parse_port(vec![String::from("22")])?, 22);
         Ok(())
     }
 
     #[test]
     fn should_fail_parsing_port() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_port(vec![String::from("1234567")]).unwrap_err(),
             SshParserError::ExpectedPort
@@ -1142,6 +1339,7 @@ mod test {
 
     #[test]
     fn should_parse_string() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_string(vec![String::from("foobar")])?,
             String::from("foobar")
@@ -1151,6 +1349,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_string() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_string(vec![]).unwrap_err(),
             SshParserError::MissingArgument
@@ -1159,6 +1358,7 @@ mod test {
 
     #[test]
     fn should_parse_unsigned() -> Result<(), SshParserError> {
+        crate::test_log();
         assert_eq!(
             SshConfigParser::parse_unsigned(vec![String::from("43")])?,
             43
@@ -1168,6 +1368,7 @@ mod test {
 
     #[test]
     fn should_fail_parsing_unsigned() {
+        crate::test_log();
         assert!(matches!(
             SshConfigParser::parse_unsigned(vec![String::from("abc")]).unwrap_err(),
             SshParserError::ExpectedUnsigned
@@ -1180,6 +1381,8 @@ mod test {
 
     #[test]
     fn should_strip_comments() {
+        crate::test_log();
+
         assert_eq!(
             SshConfigParser::strip_comments("host my_host # this is my fav host").as_str(),
             "host my_host "
@@ -1299,5 +1502,128 @@ Host *
     "##;
         tmpfile.write_all(config.as_bytes()).unwrap();
         tmpfile
+    }
+
+    #[test]
+    fn test_should_parse_config_with_include() {
+        crate::test_log();
+
+        let config = create_include_config();
+        let file = File::open(config.config.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+
+        let config = SshConfig::default()
+            .parse(&mut reader, ParseRule::STRICT)
+            .expect("Failed to parse config");
+
+        // verify include 1 overwrites the default value
+        let glob_params = config.query("192.168.1.1");
+        assert_eq!(
+            glob_params.connect_timeout.unwrap(),
+            Duration::from_secs(60)
+        );
+        assert_eq!(
+            glob_params.server_alive_interval.unwrap(),
+            Duration::from_secs(60)
+        );
+        assert_eq!(glob_params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(
+            glob_params.ciphers.as_deref().unwrap(),
+            &["a-manella", "blowfish",]
+        );
+
+        // verify tostapane
+        let tostapane_params = config.query("tostapane");
+        assert_eq!(
+            tostapane_params.connect_timeout.unwrap(),
+            Duration::from_secs(180)
+        );
+        assert_eq!(
+            tostapane_params.server_alive_interval.unwrap(),
+            Duration::from_secs(180)
+        );
+        assert_eq!(tostapane_params.tcp_keep_alive.unwrap(), true);
+        // verify ciphers
+        assert_eq!(
+            tostapane_params.ciphers.as_deref().unwrap(),
+            &[
+                "a-manella",
+                "blowfish",
+                "coi-piedi",
+                "cazdecan",
+                "triestin-stretto"
+            ]
+        );
+    }
+
+    #[allow(dead_code)]
+    struct ConfigWithInclude {
+        config: NamedTempFile,
+        inc1: NamedTempFile,
+        inc2: NamedTempFile,
+    }
+
+    fn create_include_config() -> ConfigWithInclude {
+        let mut config_file: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let mut inc1_file: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let mut inc2_file: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+
+        let config = format!(
+            r##"
+# ssh config
+# written by veeso
+
+
+        # I put a comment here just to annoy
+
+IgnoreUnknown Pippo,Pluto
+
+Compression yes
+ConnectionAttempts          10
+ConnectTimeout 60
+ServerAliveInterval 40
+Ciphers     +a-manella,blowfish
+Include {inc1}
+
+# Let's start defining some hosts
+
+Host tostapane
+    User    ciro-esposito
+    HostName    192.168.24.32
+    RemoteForward   88
+    Compression no
+    Pippo yes
+    Pluto 56
+    Include {inc2}
+"##,
+            inc1 = inc1_file.path().display(),
+            inc2 = inc2_file.path().display()
+        );
+        config_file.write_all(config.as_bytes()).unwrap();
+
+        // write include 1
+        let inc1 = r##"
+        ConnectTimeout 60
+        ServerAliveInterval 60
+        TcpKeepAlive    yes
+        "##;
+        inc1_file.write_all(inc1.as_bytes()).unwrap();
+
+        // write include 2
+        let inc2 = r##"
+        ConnectTimeout 180
+        ServerAliveInterval 180
+        Ciphers     +a-manella,blowfish,coi-piedi,cazdecan,triestin-stretto
+        "##;
+        inc2_file.write_all(inc2.as_bytes()).unwrap();
+
+        ConfigWithInclude {
+            config: config_file,
+            inc1: inc1_file,
+            inc2: inc2_file,
+        }
     }
 }
