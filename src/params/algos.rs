@@ -38,7 +38,7 @@ pub enum Algorithms {
 
 #[derive(Debug, PartialEq, Eq)]
 /// The type of algorithm operation.
-enum AlgoType {
+enum AlgoOp {
     Append,
     Head,
     Exclude,
@@ -72,7 +72,7 @@ impl Algorithms {
             return;
         }
 
-        let current_algo_type = self.algo_type();
+        let current_algo_type = self.op();
 
         let mut current_algos = self.algos();
 
@@ -89,7 +89,7 @@ impl Algorithms {
                 current_algos = b.algos();
                 current_algos.extend(self.algos());
             }
-            Self::Exclude(_) if current_algo_type == AlgoType::Exclude => {
+            Self::Exclude(_) if current_algo_type == AlgoOp::Exclude => {
                 // if both are exclude, merge them, exclude duplicates
                 for algo in b.algos() {
                     if !current_algos.iter().any(|s| s == &algo) {
@@ -112,20 +112,21 @@ impl Algorithms {
         }
 
         match current_algo_type {
-            AlgoType::Append => *self = Self::Append(current_algos),
-            AlgoType::Head => *self = Self::Head(current_algos),
-            AlgoType::Exclude => *self = Self::Exclude(current_algos),
-            AlgoType::Set => *self = Self::Set(current_algos),
+            AlgoOp::Append => *self = Self::Append(current_algos),
+            AlgoOp::Head => *self = Self::Head(current_algos),
+            AlgoOp::Exclude => *self = Self::Exclude(current_algos),
+            AlgoOp::Set => *self = Self::Set(current_algos),
         }
     }
 
-    fn algo_type(&self) -> AlgoType {
+    /// Get [`AlgoOp`] from the current variant.
+    fn op(&self) -> AlgoOp {
         match self {
-            Self::Append(_) => AlgoType::Append,
-            Self::Head(_) => AlgoType::Head,
-            Self::Exclude(_) => AlgoType::Exclude,
-            Self::Set(_) => AlgoType::Set,
-            Self::Undefined => AlgoType::Set,
+            Self::Append(_) => AlgoOp::Append,
+            Self::Head(_) => AlgoOp::Head,
+            Self::Exclude(_) => AlgoOp::Exclude,
+            Self::Set(_) => AlgoOp::Set,
+            Self::Undefined => AlgoOp::Set,
         }
     }
 }
@@ -140,10 +141,10 @@ impl FromStr for Algorithms {
 
         // get first char
         let (op, start) = match s.chars().next().expect("can't be empty") {
-            '+' => (AlgoType::Append, 1),
-            '^' => (AlgoType::Head, 1),
-            '-' => (AlgoType::Exclude, 1),
-            _ => (AlgoType::Set, 0),
+            '+' => (AlgoOp::Append, 1),
+            '^' => (AlgoOp::Head, 1),
+            '-' => (AlgoOp::Exclude, 1),
+            _ => (AlgoOp::Set, 0),
         };
 
         let algos = s[start..]
@@ -152,10 +153,10 @@ impl FromStr for Algorithms {
             .collect::<Vec<String>>();
 
         match op {
-            AlgoType::Append => Ok(Self::Append(algos)),
-            AlgoType::Head => Ok(Self::Head(algos)),
-            AlgoType::Exclude => Ok(Self::Exclude(algos)),
-            AlgoType::Set => Ok(Self::Set(algos)),
+            AlgoOp::Append => Ok(Self::Append(algos)),
+            AlgoOp::Head => Ok(Self::Head(algos)),
+            AlgoOp::Exclude => Ok(Self::Exclude(algos)),
+            AlgoOp::Set => Ok(Self::Set(algos)),
         }
     }
 }
