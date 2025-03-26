@@ -117,15 +117,10 @@ impl SshConfigParser {
                 let pattern = Self::parse_host(args)?;
                 trace!("Adding new host: {pattern:?}",);
 
-                // check if host already exists
-                if let Some(existing) = config.hosts.iter_mut().find(|x| x.pattern == pattern) {
-                    current_host = existing;
-                } else {
-                    // Add a new host
-                    config.hosts.push(Host::new(pattern, params));
-                    // Update current host pointer
-                    current_host = config.hosts.last_mut().unwrap();
-                }
+                // Add a new host
+                config.hosts.push(Host::new(pattern, params));
+                // Update current host pointer
+                current_host = config.hosts.last_mut().unwrap();
             } else {
                 // Update field
                 match Self::update_host(field, args, current_host, rules) {
@@ -610,7 +605,10 @@ mod test {
                 "triestin-stretto",
             ]
         );
-        assert_eq!(params_172_26_104_4.mac.as_deref().unwrap(), &["concorde"]);
+        assert_eq!(
+            params_172_26_104_4.mac.as_deref().unwrap(),
+            &["spyro", "deoxys"]
+        ); // use subconfig; defined before * macs
         assert_eq!(
             params_172_26_104_4
                 .pubkey_accepted_algorithms

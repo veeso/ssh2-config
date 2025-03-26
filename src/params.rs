@@ -241,6 +241,7 @@ impl HostParams {
     ///
     /// Reference <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>
     fn resolve_algorithms(current_list: &mut Vec<String>, algos: &[String]) {
+        trace!("resolving algorithms - current {current_list:?}, incoming: {algos:?}");
         if algos.is_empty() {
             return;
         }
