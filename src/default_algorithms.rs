@@ -1,3 +1,5 @@
+mod openssh;
+
 /// Default algorithms for ssh.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DefaultAlgorithms {
@@ -11,15 +13,7 @@ pub struct DefaultAlgorithms {
 
 impl Default for DefaultAlgorithms {
     fn default() -> Self {
-        // TODO: read from build
-        Self {
-            ca_signature_algorithms: vec![],
-            ciphers: vec![],
-            host_key_algorithms: vec![],
-            kex_algorithms: vec![],
-            mac: vec![],
-            pubkey_accepted_algorithms: vec![],
-        }
+        self::openssh::defaults()
     }
 }
 
