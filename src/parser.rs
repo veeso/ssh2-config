@@ -13,6 +13,7 @@ use glob::glob;
 use thiserror::Error;
 
 use super::{Host, HostClause, HostParams, SshConfig};
+use crate::Algorithms;
 
 // modules
 mod field;
@@ -174,9 +175,9 @@ impl SshConfigParser {
                 params.bind_interface = Some(value);
             }
             Field::CaSignatureAlgorithms => {
-                let value = Self::parse_comma_separated_list(args)?;
+                let value = Self::parse_algos(args)?;
                 trace!("ca_signature_algorithms: {value:?}",);
-                params.ca_signature_algorithms = Some(value);
+                params.ca_signature_algorithms = value;
             }
             Field::CertificateFile => {
                 let value = Self::parse_path(args)?;
@@ -184,9 +185,9 @@ impl SshConfigParser {
                 params.certificate_file = Some(value);
             }
             Field::Ciphers => {
-                let value = Self::parse_comma_separated_list(args)?;
+                let value = Self::parse_algos(args)?;
                 trace!("ciphers: {value:?}",);
-                params.ciphers = Some(value);
+                params.ciphers = value;
             }
             Field::Compression => {
                 let value = Self::parse_boolean(args)?;
@@ -205,9 +206,9 @@ impl SshConfigParser {
             }
             Field::Host => { /* already handled before */ }
             Field::HostKeyAlgorithms => {
-                let value = Self::parse_comma_separated_list(args)?;
+                let value = Self::parse_algos(args)?;
                 trace!("host_key_algorithm: {value:?}",);
-                params.host_key_algorithms = Some(value);
+                params.host_key_algorithms = value;
             }
             Field::HostName => {
                 let value = Self::parse_string(args)?;
@@ -228,14 +229,14 @@ impl SshConfigParser {
                 params.ignore_unknown = Some(value);
             }
             Field::KexAlgorithms => {
-                let value = Self::parse_comma_separated_list(args)?;
+                let value = Self::parse_algos(args)?;
                 trace!("kex_algorithms: {value:?}",);
-                params.kex_algorithms = Some(value);
+                params.kex_algorithms = value;
             }
             Field::Mac => {
-                let value = Self::parse_comma_separated_list(args)?;
+                let value = Self::parse_algos(args)?;
                 trace!("mac: {value:?}",);
-                params.mac = Some(value);
+                params.mac = value;
             }
             Field::Port => {
                 let value = Self::parse_port(args)?;
@@ -243,9 +244,9 @@ impl SshConfigParser {
                 params.port = Some(value);
             }
             Field::PubkeyAcceptedAlgorithms => {
-                let value = Self::parse_comma_separated_list(args)?;
+                let value = Self::parse_algos(args)?;
                 trace!("pubkey_accepted_algorithms: {value:?}",);
-                params.pubkey_accepted_algorithms = Some(value);
+                params.pubkey_accepted_algorithms = value;
             }
             Field::PubkeyAuthentication => {
                 let value = Self::parse_boolean(args)?;
@@ -415,6 +416,13 @@ impl SshConfigParser {
         }
     }
 
+    /// Parse algorithms argument
+    fn parse_algos(args: Vec<String>) -> SshParserResult<Algorithms> {
+        let first = args.first().ok_or(SshParserError::MissingArgument)?;
+
+        Algorithms::from_str(first)
+    }
+
     /// Parse comma separated list arguments
     fn parse_comma_separated_list(args: Vec<String>) -> SshParserResult<Vec<String>> {
         match args
@@ -548,29 +556,17 @@ mod test {
             Duration::from_secs(40)
         );
         assert_eq!(params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(params.ciphers.algos(), &["a-manella", "blowfish"]);
         assert_eq!(
-            params.ciphers.as_deref().unwrap(),
-            &["a-manella", "blowfish"]
-        );
-        assert_eq!(
-            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            params.pubkey_accepted_algorithms.algos(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
         // Query explicit all-hosts fallback options (`Host *`)
-        assert_eq!(
-            params.ca_signature_algorithms.as_deref().unwrap(),
-            &["random"]
-        );
-        assert_eq!(
-            params.host_key_algorithms.as_deref().unwrap(),
-            &["luigi", "mario",]
-        );
-        assert_eq!(
-            params.kex_algorithms.as_deref().unwrap(),
-            &["desu", "gigi",]
-        );
-        assert_eq!(params.mac.as_deref().unwrap(), &["concorde"]);
+        assert_eq!(params.ca_signature_algorithms.algos(), &["random"]);
+        assert_eq!(params.host_key_algorithms.algos(), &["luigi", "mario",]);
+        assert_eq!(params.kex_algorithms.algos(), &["desu", "gigi",]);
+        assert_eq!(params.mac.algos(), &["concorde"]);
         assert!(params.bind_address.is_none());
 
         // Query 172.26.104.4, yielding cmdline overrides,
@@ -589,14 +585,11 @@ mod test {
 
         // all-hosts fallback options, merged with host-specific options
         assert_eq!(
-            params_172_26_104_4
-                .ca_signature_algorithms
-                .as_deref()
-                .unwrap(),
+            params_172_26_104_4.ca_signature_algorithms.algos(),
             &["random"]
         );
         assert_eq!(
-            params_172_26_104_4.ciphers.as_deref().unwrap(),
+            params_172_26_104_4.ciphers.algos(),
             &[
                 "a-manella",
                 "blowfish",
@@ -605,16 +598,10 @@ mod test {
                 "triestin-stretto",
             ]
         );
+        assert_eq!(params_172_26_104_4.mac.algos(), &["spyro", "deoxys"]); // use subconfig; defined before * macs
         assert_eq!(
-            params_172_26_104_4.mac.as_deref().unwrap(),
-            &["spyro", "deoxys"]
-        ); // use subconfig; defined before * macs
-        assert_eq!(
-            params_172_26_104_4
-                .pubkey_accepted_algorithms
-                .as_deref()
-                .unwrap(),
-            &["desu", "fast-omar-crypt"]
+            params_172_26_104_4.pubkey_accepted_algorithms,
+            Algorithms::Exclude(vec!["omar-crypt".to_string()])
         );
         assert_eq!(
             params_172_26_104_4.bind_address.as_deref().unwrap(),
@@ -648,22 +635,19 @@ mod test {
 
         // all-hosts fallback options
         assert_eq!(
-            params_tostapane.ca_signature_algorithms.as_deref().unwrap(),
+            params_tostapane.ca_signature_algorithms.algos(),
             &["random"]
         );
         assert_eq!(
-            params_tostapane.ciphers.as_deref().unwrap(),
+            params_tostapane.ciphers.algos(),
             &["a-manella", "blowfish",]
         );
         assert_eq!(
-            params_tostapane.mac.as_deref().unwrap(),
-            &["concorde", "spyro", "deoxys",]
+            params_tostapane.mac,
+            Algorithms::Append(vec!["spyro".to_string(), "deoxys".to_string(),])
         );
         assert_eq!(
-            params_tostapane
-                .pubkey_accepted_algorithms
-                .as_deref()
-                .unwrap(),
+            params_tostapane.pubkey_accepted_algorithms.algos(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
@@ -685,22 +669,16 @@ mod test {
 
         // all-hosts fallback options
         assert_eq!(
-            params_192_168_1_30
-                .ca_signature_algorithms
-                .as_deref()
-                .unwrap(),
+            params_192_168_1_30.ca_signature_algorithms.algos(),
             &["random"]
         );
         assert_eq!(
-            params_192_168_1_30.ciphers.as_deref().unwrap(),
+            params_192_168_1_30.ciphers.algos(),
             &["a-manella", "blowfish"]
         );
-        assert_eq!(params_192_168_1_30.mac.as_deref().unwrap(), &["concorde"]);
+        assert_eq!(params_192_168_1_30.mac.algos(), &["concorde"]);
         assert_eq!(
-            params_192_168_1_30
-                .pubkey_accepted_algorithms
-                .as_deref()
-                .unwrap(),
+            params_192_168_1_30.pubkey_accepted_algorithms.algos(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
@@ -839,7 +817,7 @@ mod test {
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            host.params.ca_signature_algorithms.as_deref().unwrap(),
+            host.params.ca_signature_algorithms.algos(),
             &["a", "b", "c"]
         );
         Ok(())
@@ -872,7 +850,7 @@ mod test {
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(host.params.ciphers.as_deref().unwrap(), &["a", "b", "c"]);
+        assert_eq!(host.params.ciphers.algos(), &["a", "b", "c"]);
         Ok(())
     }
 
@@ -931,10 +909,7 @@ mod test {
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(
-            host.params.host_key_algorithms.as_deref().unwrap(),
-            &["a", "b", "c"]
-        );
+        assert_eq!(host.params.host_key_algorithms.algos(), &["a", "b", "c"]);
         Ok(())
     }
 
@@ -979,10 +954,7 @@ mod test {
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(
-            host.params.kex_algorithms.as_deref().unwrap(),
-            &["a", "b", "c"]
-        );
+        assert_eq!(host.params.kex_algorithms.algos(), &["a", "b", "c"]);
         Ok(())
     }
 
@@ -996,7 +968,7 @@ mod test {
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(host.params.mac.as_deref().unwrap(), &["a", "b", "c"]);
+        assert_eq!(host.params.mac.algos(), &["a", "b", "c"]);
         Ok(())
     }
 
@@ -1025,7 +997,7 @@ mod test {
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            host.params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            host.params.pubkey_accepted_algorithms.algos(),
             &["a", "b", "c"]
         );
         Ok(())
@@ -1213,6 +1185,32 @@ mod test {
             SshConfigParser::parse_boolean(vec![]).unwrap_err(),
             SshParserError::MissingArgument
         ));
+    }
+
+    #[test]
+    fn should_parse_algos() -> Result<(), SshParserError> {
+        crate::test_log();
+        assert_eq!(
+            SshConfigParser::parse_algos(vec![String::from("a,b,c,d")])?,
+            Algorithms::Set(vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+            ])
+        );
+
+        assert_eq!(
+            SshConfigParser::parse_algos(vec![String::from("a")])?,
+            Algorithms::Set(vec!["a".to_string()])
+        );
+
+        assert_eq!(
+            SshConfigParser::parse_algos(vec![String::from("+a,b")])?,
+            Algorithms::Append(vec!["a".to_string(), "b".to_string()])
+        );
+
+        Ok(())
     }
 
     #[test]
@@ -1559,10 +1557,7 @@ Host *
             Duration::from_secs(40) // first read
         );
         assert_eq!(glob_params.tcp_keep_alive.unwrap(), true);
-        assert_eq!(
-            glob_params.ciphers.as_deref().unwrap(),
-            &["a-manella", "blowfish",]
-        );
+        assert_eq!(glob_params.ciphers.algos(), &["a-manella", "blowfish",]);
 
         // verify tostapane
         let tostapane_params = config.query("tostapane");
@@ -1577,7 +1572,7 @@ Host *
         assert_eq!(tostapane_params.tcp_keep_alive.unwrap(), true);
         // verify ciphers
         assert_eq!(
-            tostapane_params.ciphers.as_deref().unwrap(),
+            tostapane_params.ciphers.algos(),
             &[
                 "a-manella",
                 "blowfish",

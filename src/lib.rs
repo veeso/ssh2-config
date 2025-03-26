@@ -54,6 +54,55 @@
 //!
 //! ```
 //!
+//! ---
+//!
+//! ## How host parameters are resolved
+//!
+//! This topic has been debated a lot over the years, so finally since 0.5 this has been fixed to follow the official ssh configuration file rules, as described in the MAN <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#DESCRIPTION>.
+//!
+//! > Unless noted otherwise, for each parameter, the first obtained value will be used. The configuration files contain sections separated by Host specifications, and that section is only applied for hosts that match one of the patterns given in the specification. The matched host name is usually the one given on the command line (see the CanonicalizeHostname option for exceptions).
+//! >
+//! > Since the first obtained value for each parameter is used, more host-specific declarations should be given near the beginning of the file, and general defaults at the end.
+//!
+//! This means that:
+//!
+//! 1. The first obtained value parsing the configuration top-down will be used
+//! 2. Host specific rules ARE not overriding default ones if they are not the first obtained value
+//! 3. If you want to achieve default values to be less specific than host specific ones, you should put the default values at the end of the configuration file using `Host *`.
+//! 4. Algorithms, so `KexAlgorithms`, `Ciphers`, `MACs` and `HostKeyAlgorithms` use a different resolvers which supports appending, excluding and heading insertions, as described in the man page at ciphers: <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>.
+//!
+//! ### Resolvers examples
+//!
+//! ```ssh
+//! Compression yes
+//!
+//! Host 192.168.1.1
+//!     Compression no
+//! ```
+//!
+//! If we get rules for `192.168.1.1`, compression will be `yes`, because it's the first obtained value.
+//!
+//! ```ssh
+//! Host 192.168.1.1
+//!     Compression no
+//!
+//! Host *
+//!     Compression yes
+//! ```
+//!
+//! If we get rules for `192.168.1.1`, compression will be `no`, because it's the first obtained value.
+//!
+//! If we get rules for `172.168.1.1`, compression will be `yes`, because it's the first obtained value MATCHING the host rule.
+//!
+//! ```ssh
+//! Ciphers a,b
+//!
+//! Host 192.168.1.1
+//!     Ciphers +c
+//! ```
+//!
+//! If we get rules for `192.168.1.1`, ciphers will be `a,b,c`, because default is set to `a,b` and `+c` means append `c` to the list.
+//!
 
 #![doc(html_playground_url = "https://play.rust-lang.org")]
 
@@ -73,7 +122,7 @@ mod serializer;
 
 // -- export
 pub use host::{Host, HostClause};
-pub use params::HostParams;
+pub use params::{Algorithms, HostParams};
 pub use parser::{ParseRule, SshParserError, SshParserResult};
 
 /// Describes the ssh configuration.

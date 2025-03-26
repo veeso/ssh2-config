@@ -64,6 +64,8 @@
     - [Missing features](#missing-features)
   - [Get started 🚀](#get-started-)
     - [Reading unsupported fields](#reading-unsupported-fields)
+  - [How host parameters are resolved](#how-host-parameters-are-resolved)
+    - [Resolvers examples](#resolvers-examples)
     - [Examples](#examples)
   - [Support the developer ☕](#support-the-developer-)
   - [Contributing and issues 🤝🏻](#contributing-and-issues-)
@@ -96,8 +98,8 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 - **ConnectTimeout**: you can use this attribute to set the connection timeout for the socket
 - **HostName**: you can use this attribute to get the real name of the host to connect to
 - **IdentityFile**: you can use this attribute to set the keys to try when connecting to remote host.
-- **KexAlgorithms**: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.join(",").as_str())`
-- **MACs**: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos.join(",").as_str())` and `session.method_pref(MethodType::MacSc, algos.join(",").as_str())`
+- **KexAlgorithms**: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.to_string().as_str())`
+- **MACs**: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos..to_string().as_str())` and `session.method_pref(MethodType::MacSc, algos..to_string().as_str())`
 - **Port**: you can use this attribute to resolve the port to connect to
 - **PubkeyAuthentication**: you can use this attribute to set whether to use the pubkey authentication
 - **RemoteForward**: you can use this method to implement port forwarding with `session.channel_forward_listen()`
@@ -119,7 +121,7 @@ First of all, add ssh2-config to your dependencies
 
 ```toml
 [dependencies]
-ssh2-config = "^0.4"
+ssh2-config = "^0.5"
 ```
 
 then parse the configuration
@@ -150,32 +152,37 @@ fn configure_session(session: &mut Session, params: &HostParams) {
         let interval = params.server_alive_interval.unwrap().as_secs() as u32;
         session.set_keepalive(true, interval);
     }
-    // algos
-    if let Some(algos) = params.kex_algorithms.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::Kex, algos.join(",").as_str()) {
-            panic!("Could not set KEX algorithms: {}", err);
-        }
+    // KEX
+    if let Err(err) =
+        session.method_pref(MethodType::Kex, params.kex_algorithms.to_string().as_str())
+    {
+        panic!("Could not set KEX algorithms: {}", err);
     }
-    if let Some(algos) = params.host_key_algorithms.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::HostKey, algos.join(",").as_str()) {
-            panic!("Could not set host key algorithms: {}", err);
-        }
+
+    // host key
+    if let Err(err) = session.method_pref(
+        MethodType::HostKey,
+        params.host_key_algorithms.to_string().as_str(),
+    ) {
+        panic!("Could not set host key algorithms: {}", err);
     }
-    if let Some(algos) = params.ciphers.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::CryptCs, algos.join(",").as_str()) {
-            panic!("Could not set crypt algorithms (client-server): {}", err);
-        }
-        if let Err(err) = session.method_pref(MethodType::CryptSc, algos.join(",").as_str()) {
-            panic!("Could not set crypt algorithms (server-client): {}", err);
-        }
+
+    // ciphers
+    if let Err(err) = session.method_pref(MethodType::CryptCs, params.ciphers.to_string().as_str())
+    {
+        panic!("Could not set crypt algorithms (client-server): {}", err);
     }
-    if let Some(algos) = params.mac.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::MacCs, algos.join(",").as_str()) {
-            panic!("Could not set MAC algorithms (client-server): {}", err);
-        }
-        if let Err(err) = session.method_pref(MethodType::MacSc, algos.join(",").as_str()) {
-            panic!("Could not set MAC algorithms (server-client): {}", err);
-        }
+    if let Err(err) = session.method_pref(MethodType::CryptSc, params.ciphers.to_string().as_str())
+    {
+        panic!("Could not set crypt algorithms (server-client): {}", err);
+    }
+
+    // mac
+    if let Err(err) = session.method_pref(MethodType::MacCs, params.mac.to_string().as_str()) {
+        panic!("Could not set MAC algorithms (client-server): {}", err);
+    }
+    if let Err(err) = session.method_pref(MethodType::MacSc, params.mac.to_string().as_str()) {
+        panic!("Could not set MAC algorithms (server-client): {}", err);
     }
 }
 
@@ -212,6 +219,57 @@ let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTE
 let params = config.query("192.168.1.2");
 let forwards = params.unsupported_fields.get("dynamicforward");
 ```
+
+---
+
+## How host parameters are resolved
+
+This topic has been debated a lot over the years, so finally since 0.5 this has been fixed to follow the official ssh configuration file rules, as described in the MAN <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#DESCRIPTION>.
+
+> Unless noted otherwise, for each parameter, the first obtained value will be used. The configuration files contain sections separated by Host specifications, and that section is only applied for hosts that match one of the patterns given in the specification. The matched host name is usually the one given on the command line (see the CanonicalizeHostname option for exceptions).
+>
+> Since the first obtained value for each parameter is used, more host-specific declarations should be given near the beginning of the file, and general defaults at the end.
+
+This means that:
+
+1. The first obtained value parsing the configuration top-down will be used
+2. Host specific rules ARE not overriding default ones if they are not the first obtained value
+3. If you want to achieve default values to be less specific than host specific ones, you should put the default values at the end of the configuration file using `Host *`.
+4. Algorithms, so `KexAlgorithms`, `Ciphers`, `MACs` and `HostKeyAlgorithms` use a different resolvers which supports appending, excluding and heading insertions, as described in the man page at ciphers: <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>.
+
+### Resolvers examples
+
+```ssh
+Compression yes
+
+Host 192.168.1.1
+    Compression no
+```
+
+If we get rules for `192.168.1.1`, compression will be `yes`, because it's the first obtained value.
+
+```ssh
+Host 192.168.1.1
+    Compression no
+
+Host *
+    Compression yes
+```
+
+If we get rules for `192.168.1.1`, compression will be `no`, because it's the first obtained value.
+
+If we get rules for `172.168.1.1`, compression will be `yes`, because it's the first obtained value MATCHING the host rule.
+
+```ssh
+Ciphers a,b
+
+Host 192.168.1.1
+    Ciphers +c
+```
+
+If we get rules for `192.168.1.1`, ciphers will be `a,b,c`, because default is set to `a,b` and `+c` means append `c` to the list.
+
+---
 
 ### Examples
 

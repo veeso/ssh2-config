@@ -48,23 +48,23 @@ impl SshConfigSerializer<'_> {
         if let Some(value) = params.bind_interface.as_ref() {
             writeln!(f, "{padding}BindAddress {value}",)?;
         }
-        if let Some(ca_signature_algorithms) = params.ca_signature_algorithms.as_ref() {
+        if params.ca_signature_algorithms.is_some() {
             writeln!(
                 f,
                 "{padding}CASignatureAlgorithms {ca_signature_algorithms}",
                 padding = padding,
-                ca_signature_algorithms = ca_signature_algorithms.join(" ")
+                ca_signature_algorithms = params.ca_signature_algorithms
             )?;
         }
         if let Some(certificate_file) = params.certificate_file.as_ref() {
             writeln!(f, "{padding}CertificateFile {}", certificate_file.display())?;
         }
-        if let Some(ciphers) = params.ciphers.as_ref() {
+        if params.ciphers.is_some() {
             writeln!(
                 f,
                 "{padding}Ciphers {ciphers}",
                 padding = padding,
-                ciphers = ciphers.join(",")
+                ciphers = params.ciphers
             )?;
         }
         if let Some(value) = params.compression.as_ref() {
@@ -80,12 +80,12 @@ impl SshConfigSerializer<'_> {
         if let Some(connect_timeout) = params.connect_timeout {
             writeln!(f, "{padding}ConnectTimeout {}", connect_timeout.as_secs())?;
         }
-        if let Some(host_key_algorithms) = params.host_key_algorithms.as_ref() {
+        if params.host_key_algorithms.is_some() {
             writeln!(
                 f,
                 "{padding}HostKeyAlgorithms {host_key_algorithms}",
                 padding = padding,
-                host_key_algorithms = host_key_algorithms.join(",")
+                host_key_algorithms = params.host_key_algorithms
             )?;
         }
         if let Some(host_name) = params.host_name.as_ref() {
@@ -113,31 +113,31 @@ impl SshConfigSerializer<'_> {
                     .join(",")
             )?;
         }
-        if let Some(kex_algorithms) = params.kex_algorithms.as_ref() {
+        if params.kex_algorithms.is_some() {
             writeln!(
                 f,
                 "{padding}KexAlgorithms {kex_algorithms}",
                 padding = padding,
-                kex_algorithms = kex_algorithms.join(",")
+                kex_algorithms = params.kex_algorithms
             )?;
         }
-        if let Some(mac) = params.mac.as_ref() {
+        if params.mac.is_some() {
             writeln!(
                 f,
                 "{padding}MACs {mac}",
                 padding = padding,
-                mac = mac.join(",")
+                mac = params.mac
             )?;
         }
         if let Some(port) = params.port {
             writeln!(f, "{padding}Port {port}", port = port)?;
         }
-        if let Some(pubkey_accepted_algorithms) = params.pubkey_accepted_algorithms.as_ref() {
+        if params.pubkey_accepted_algorithms.is_some() {
             writeln!(
                 f,
                 "{padding}PubkeyAcceptedAlgorithms {pubkey_accepted_algorithms}",
                 padding = padding,
-                pubkey_accepted_algorithms = pubkey_accepted_algorithms.join(",")
+                pubkey_accepted_algorithms = params.pubkey_accepted_algorithms
             )?;
         }
         if let Some(pubkey_authentication) = params.pubkey_authentication.as_ref() {
