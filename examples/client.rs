@@ -141,35 +141,46 @@ fn configure_session(session: &mut Session, params: &HostParams) {
     }
 
     // KEX
-    if let Err(err) =
-        session.method_pref(MethodType::Kex, params.kex_algorithms.to_string().as_str())
-    {
+    if let Err(err) = session.method_pref(
+        MethodType::Kex,
+        params.kex_algorithms.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set KEX algorithms: {}", err);
     }
 
     // host key
     if let Err(err) = session.method_pref(
         MethodType::HostKey,
-        params.host_key_algorithms.to_string().as_str(),
+        params.host_key_algorithms.algorithms().join(",").as_str(),
     ) {
         panic!("Could not set host key algorithms: {}", err);
     }
 
     // ciphers
-    if let Err(err) = session.method_pref(MethodType::CryptCs, params.ciphers.to_string().as_str())
-    {
+    if let Err(err) = session.method_pref(
+        MethodType::CryptCs,
+        params.ciphers.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set crypt algorithms (client-server): {}", err);
     }
-    if let Err(err) = session.method_pref(MethodType::CryptSc, params.ciphers.to_string().as_str())
-    {
+    if let Err(err) = session.method_pref(
+        MethodType::CryptSc,
+        params.ciphers.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set crypt algorithms (server-client): {}", err);
     }
 
     // mac
-    if let Err(err) = session.method_pref(MethodType::MacCs, params.mac.to_string().as_str()) {
+    if let Err(err) = session.method_pref(
+        MethodType::MacCs,
+        params.mac.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set MAC algorithms (client-server): {}", err);
     }
-    if let Err(err) = session.method_pref(MethodType::MacSc, params.mac.to_string().as_str()) {
+    if let Err(err) = session.method_pref(
+        MethodType::MacSc,
+        params.mac.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set MAC algorithms (server-client): {}", err);
     }
 }

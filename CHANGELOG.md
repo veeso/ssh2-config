@@ -26,9 +26,10 @@ Released on 26/03/2025
 - Replaced algorithms `Vec<String>` with `Algorithms` type.
   - The new type is a variant with `Append`, `Head`, `Exclude` and `Set`.
   - This allows to **ACTUALLY** handle algorithms correctly.
-  - To pass to ssh options, use `to_string()` method or access to internal vec string.
+  - To pass to ssh options, use `algorithms()` method
   - Beware that when accessing the internal vec, you MUST care of what it means for that variant.
 - Replaced `HostParams::merge` with `HostParams::overwrite_if_none` to avoid overwriting existing values.
+- Added default Algorithms to the SshConfig structure. See readme for details on how to use it.
 
 ## 0.4.0
 

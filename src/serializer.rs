@@ -48,7 +48,7 @@ impl SshConfigSerializer<'_> {
         if let Some(value) = params.bind_interface.as_ref() {
             writeln!(f, "{padding}BindAddress {value}",)?;
         }
-        if params.ca_signature_algorithms.is_some() {
+        if !params.ca_signature_algorithms.is_default() {
             writeln!(
                 f,
                 "{padding}CASignatureAlgorithms {ca_signature_algorithms}",
@@ -59,7 +59,7 @@ impl SshConfigSerializer<'_> {
         if let Some(certificate_file) = params.certificate_file.as_ref() {
             writeln!(f, "{padding}CertificateFile {}", certificate_file.display())?;
         }
-        if params.ciphers.is_some() {
+        if !params.ciphers.is_default() {
             writeln!(
                 f,
                 "{padding}Ciphers {ciphers}",
@@ -80,7 +80,7 @@ impl SshConfigSerializer<'_> {
         if let Some(connect_timeout) = params.connect_timeout {
             writeln!(f, "{padding}ConnectTimeout {}", connect_timeout.as_secs())?;
         }
-        if params.host_key_algorithms.is_some() {
+        if !params.host_key_algorithms.is_default() {
             writeln!(
                 f,
                 "{padding}HostKeyAlgorithms {host_key_algorithms}",
@@ -113,7 +113,7 @@ impl SshConfigSerializer<'_> {
                     .join(",")
             )?;
         }
-        if params.kex_algorithms.is_some() {
+        if !params.kex_algorithms.is_default() {
             writeln!(
                 f,
                 "{padding}KexAlgorithms {kex_algorithms}",
@@ -121,7 +121,7 @@ impl SshConfigSerializer<'_> {
                 kex_algorithms = params.kex_algorithms
             )?;
         }
-        if params.mac.is_some() {
+        if !params.mac.is_default() {
             writeln!(
                 f,
                 "{padding}MACs {mac}",
@@ -132,7 +132,7 @@ impl SshConfigSerializer<'_> {
         if let Some(port) = params.port {
             writeln!(f, "{padding}Port {port}", port = port)?;
         }
-        if params.pubkey_accepted_algorithms.is_some() {
+        if !params.pubkey_accepted_algorithms.is_default() {
             writeln!(
                 f,
                 "{padding}PubkeyAcceptedAlgorithms {pubkey_accepted_algorithms}",

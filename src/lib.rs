@@ -95,13 +95,12 @@
 //! If we get rules for `172.168.1.1`, compression will be `yes`, because it's the first obtained value MATCHING the host rule.
 //!
 //! ```ssh
-//! Ciphers a,b
 //!
 //! Host 192.168.1.1
 //!     Ciphers +c
 //! ```
 //!
-//! If we get rules for `192.168.1.1`, ciphers will be `a,b,c`, because default is set to `a,b` and `+c` means append `c` to the list.
+//! If we get rules for `192.168.1.1`, ciphers will be `c` appended to default algorithms, which can be specified in the [`SshConfig`] constructor.
 //!
 
 #![doc(html_playground_url = "https://play.rust-lang.org")]
@@ -115,20 +114,24 @@ use std::io::{self, BufRead, BufReader};
 use std::path::PathBuf;
 use std::time::Duration;
 // -- modules
+mod default_algorithms;
 mod host;
 mod params;
 mod parser;
 mod serializer;
 
 // -- export
-pub use host::{Host, HostClause};
-pub use params::{Algorithms, HostParams};
-pub use parser::{ParseRule, SshParserError, SshParserResult};
+pub use self::default_algorithms::DefaultAlgorithms;
+pub use self::host::{Host, HostClause};
+pub use self::params::{Algorithms, HostParams};
+pub use self::parser::{ParseRule, SshParserError, SshParserResult};
 
 /// Describes the ssh configuration.
 /// Configuration is described in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SshConfig {
+    /// Default algorithms for ssh.
+    default_algorithms: DefaultAlgorithms,
     /// Rulesets for hosts.
     /// Default config will be stored with key `*`
     hosts: Vec<Host>,
@@ -143,7 +146,7 @@ impl fmt::Display for SshConfig {
 impl SshConfig {
     /// Query params for a certain host. Returns [`HostParams`] for the host.
     pub fn query<S: AsRef<str>>(&self, pattern: S) -> HostParams {
-        let mut params = HostParams::default();
+        let mut params = HostParams::new(&self.default_algorithms);
         // iter keys, overwrite if None top-down
         for host in self.hosts.iter() {
             if host.intersects(pattern.as_ref()) {
@@ -164,7 +167,27 @@ impl SshConfig {
         self.hosts.iter().filter(|host| host.intersects(pattern))
     }
 
+    /// Set default algorithms for ssh.
+    ///
+    /// If you want to use the default algorithms from the system, you can use the `Default::default()` method.
+    pub fn default_algorithms(mut self, algos: DefaultAlgorithms) -> Self {
+        self.default_algorithms = algos;
+
+        self
+    }
+
     /// Parse [`SshConfig`] from stream which implements [`BufRead`] and return parsed configuration or parser error
+    ///
+    /// ## Example
+    ///
+    /// ```rust,ignore
+    /// let mut reader = BufReader::new(
+    ///    File::open(Path::new("./assets/ssh.config"))
+    ///       .expect("Could not open configuration file")
+    /// );
+    ///
+    /// let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
+    /// ```
     pub fn parse(mut self, reader: &mut impl BufRead, rules: ParseRule) -> SshParserResult<Self> {
         parser::SshConfigParser::parse(&mut self, reader, rules).map(|_| self)
     }
@@ -219,7 +242,10 @@ mod test {
 
         let config = SshConfig::default();
         assert_eq!(config.hosts.len(), 0);
-        assert_eq!(config.query("192.168.1.2"), HostParams::default());
+        assert_eq!(
+            config.query("192.168.1.2"),
+            HostParams::new(&DefaultAlgorithms::default())
+        );
     }
 
     #[test]
@@ -254,26 +280,21 @@ mod test {
 
         let mut config = SshConfig::default();
         // add config
-        let mut params1 = HostParams {
-            bind_address: Some(String::from("0.0.0.0")),
-            ..Default::default()
-        };
+        let mut params1 = HostParams::new(&DefaultAlgorithms::default());
+        params1.bind_address = Some("0.0.0.0".to_string());
         config.hosts.push(Host::new(
             vec![HostClause::new(String::from("192.168.*.*"), false)],
             params1.clone(),
         ));
-        let params2 = HostParams {
-            bind_interface: Some(String::from("tun0")),
-            ..Default::default()
-        };
+        let mut params2 = HostParams::new(&DefaultAlgorithms::default());
+        params2.bind_interface = Some(String::from("tun0"));
         config.hosts.push(Host::new(
             vec![HostClause::new(String::from("192.168.10.*"), false)],
             params2.clone(),
         ));
-        let params3 = HostParams {
-            host_name: Some(String::from("172.26.104.4")),
-            ..Default::default()
-        };
+
+        let mut params3 = HostParams::new(&DefaultAlgorithms::default());
+        params3.host_name = Some("172.26.104.4".to_string());
         config.hosts.push(Host::new(
             vec![
                 HostClause::new(String::from("172.26.*.*"), false),
@@ -288,6 +309,9 @@ mod test {
         assert_eq!(config.query("192.168.10.1"), params1);
         // Negated case
         assert_eq!(config.query("172.26.254.1"), params3);
-        assert_eq!(config.query("172.26.104.4"), HostParams::default());
+        assert_eq!(
+            config.query("172.26.104.4"),
+            HostParams::new(&DefaultAlgorithms::default())
+        );
     }
 }

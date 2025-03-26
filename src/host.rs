@@ -71,6 +71,7 @@ mod test {
     use pretty_assertions::assert_eq;
 
     use super::*;
+    use crate::DefaultAlgorithms;
 
     #[test]
     fn should_build_host_clause() {
@@ -97,7 +98,7 @@ mod test {
     fn should_init_host() {
         let host = Host::new(
             vec![HostClause::new("192.168.*.*".to_string(), false)],
-            HostParams::default(),
+            HostParams::new(&DefaultAlgorithms::default()),
         );
         assert_eq!(host.pattern.len(), 1);
     }
@@ -111,7 +112,7 @@ mod test {
                 HostClause::new("10.8.*.*".to_string(), false),
                 HostClause::new("10.8.0.8".to_string(), true),
             ],
-            HostParams::default(),
+            HostParams::new(&DefaultAlgorithms::default()),
         );
         assert!(host.intersects("192.168.1.32"));
         assert!(host.intersects("172.26.104.4"));
@@ -127,7 +128,7 @@ mod test {
                 HostClause::new("10.8.*.*".to_string(), false),
                 HostClause::new("10.8.0.8".to_string(), true),
             ],
-            HostParams::default(),
+            HostParams::new(&DefaultAlgorithms::default()),
         );
         assert_eq!(host.intersects("192.169.1.32"), false);
         assert_eq!(host.intersects("172.28.104.4"), false);

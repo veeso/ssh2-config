@@ -7,12 +7,14 @@ mod algos;
 use std::collections::HashMap;
 
 pub use self::algos::Algorithms;
+pub(crate) use self::algos::AlgorithmsRule;
 use super::{Duration, PathBuf};
+use crate::DefaultAlgorithms;
 
 /// Describes the ssh configuration.
 /// Configuration is describes in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
 /// Only arguments supported by libssh2 are implemented
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostParams {
     /// Specifies to use the specified address on the local machine as the source address of the connection
     pub bind_address: Option<String>,
@@ -68,6 +70,39 @@ pub struct HostParams {
 }
 
 impl HostParams {
+    /// Create a new [`HostParams`] object with the [`DefaultAlgorithms`]
+    pub fn new(default_algorithms: &DefaultAlgorithms) -> Self {
+        Self {
+            bind_address: None,
+            bind_interface: None,
+            ca_signature_algorithms: Algorithms::new(&default_algorithms.ca_signature_algorithms),
+            certificate_file: None,
+            ciphers: Algorithms::new(&default_algorithms.ciphers),
+            compression: None,
+            connection_attempts: None,
+            connect_timeout: None,
+            host_key_algorithms: Algorithms::new(&default_algorithms.host_key_algorithms),
+            host_name: None,
+            identity_file: None,
+            ignore_unknown: None,
+            kex_algorithms: Algorithms::new(&default_algorithms.kex_algorithms),
+            mac: Algorithms::new(&default_algorithms.mac),
+            port: None,
+            pubkey_accepted_algorithms: Algorithms::new(
+                &default_algorithms.pubkey_accepted_algorithms,
+            ),
+            pubkey_authentication: None,
+            remote_forward: None,
+            server_alive_interval: None,
+            tcp_keep_alive: None,
+            #[cfg(target_os = "macos")]
+            use_keychain: None,
+            user: None,
+            ignored_fields: HashMap::new(),
+            unsupported_fields: HashMap::new(),
+        }
+    }
+
     /// Return whether a certain `param` is in the ignored list
     pub(crate) fn ignored(&self, param: &str) -> bool {
         self.ignore_unknown
@@ -122,53 +157,74 @@ impl HostParams {
             }
         }
 
-        // finally merge the algorithms
-        self.merge_all_algorithms(b);
-    }
-
-    /// Given a [`HostParams`] object `b`, it will merge all the algorithms from `self` and `b`.
-    ///
-    /// The merge is done following the [`resolve_algorithms`] logic
-    ///
-    /// Reference <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>
-    fn merge_all_algorithms(&mut self, b: &Self) {
-        self.ca_signature_algorithms
-            .merge(&b.ca_signature_algorithms);
-        self.ciphers.merge(&b.ciphers);
-        self.host_key_algorithms.merge(&b.host_key_algorithms);
-        self.kex_algorithms.merge(&b.kex_algorithms);
-        self.mac.merge(&b.mac);
-        self.pubkey_accepted_algorithms
-            .merge(&b.pubkey_accepted_algorithms);
+        // merge algos if default and b is not default
+        if self.ca_signature_algorithms.is_default() && !b.ca_signature_algorithms.is_default() {
+            self.ca_signature_algorithms = b.ca_signature_algorithms.clone();
+        }
+        if self.ciphers.is_default() && !b.ciphers.is_default() {
+            self.ciphers = b.ciphers.clone();
+        }
+        if self.host_key_algorithms.is_default() && !b.host_key_algorithms.is_default() {
+            self.host_key_algorithms = b.host_key_algorithms.clone();
+        }
+        if self.kex_algorithms.is_default() && !b.kex_algorithms.is_default() {
+            self.kex_algorithms = b.kex_algorithms.clone();
+        }
+        if self.mac.is_default() && !b.mac.is_default() {
+            self.mac = b.mac.clone();
+        }
+        if self.pubkey_accepted_algorithms.is_default()
+            && !b.pubkey_accepted_algorithms.is_default()
+        {
+            self.pubkey_accepted_algorithms = b.pubkey_accepted_algorithms.clone();
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
 
+    use std::str::FromStr;
+
     use pretty_assertions::assert_eq;
 
     use super::*;
+    use crate::params::algos::AlgorithmsRule;
 
     #[test]
     fn should_initialize_params() {
-        let params = HostParams::default();
+        let params = HostParams::new(&DefaultAlgorithms::default());
         assert!(params.bind_address.is_none());
         assert!(params.bind_interface.is_none());
-        assert_eq!(params.ca_signature_algorithms, Algorithms::Undefined);
+        assert_eq!(
+            params.ca_signature_algorithms.algorithms(),
+            DefaultAlgorithms::default().ca_signature_algorithms
+        );
         assert!(params.certificate_file.is_none());
-        assert_eq!(params.ciphers, Algorithms::Undefined);
+        assert_eq!(
+            params.ciphers.algorithms(),
+            DefaultAlgorithms::default().ciphers
+        );
         assert!(params.compression.is_none());
         assert!(params.connection_attempts.is_none());
         assert!(params.connect_timeout.is_none());
-        assert_eq!(params.host_key_algorithms, Algorithms::Undefined);
+        assert_eq!(
+            params.host_key_algorithms.algorithms(),
+            DefaultAlgorithms::default().host_key_algorithms
+        );
         assert!(params.host_name.is_none());
         assert!(params.identity_file.is_none());
         assert!(params.ignore_unknown.is_none());
-        assert_eq!(params.kex_algorithms, Algorithms::Undefined);
-        assert_eq!(params.mac, Algorithms::Undefined);
+        assert_eq!(
+            params.kex_algorithms.algorithms(),
+            DefaultAlgorithms::default().kex_algorithms
+        );
+        assert_eq!(params.mac.algorithms(), DefaultAlgorithms::default().mac);
         assert!(params.port.is_none());
-        assert_eq!(params.pubkey_accepted_algorithms, Algorithms::Undefined);
+        assert_eq!(
+            params.pubkey_accepted_algorithms.algorithms(),
+            DefaultAlgorithms::default().pubkey_accepted_algorithms
+        );
         assert!(params.pubkey_authentication.is_none());
         assert!(params.remote_forward.is_none());
         assert!(params.server_alive_interval.is_none());
@@ -179,15 +235,14 @@ mod test {
 
     #[test]
     fn test_should_overwrite_if_none() {
-        let mut params = HostParams::default();
+        let mut params = HostParams::new(&DefaultAlgorithms::default());
         params.bind_address = Some(String::from("pippo"));
-        params.ciphers = Algorithms::Set(vec!["a".to_string(), "b".to_string()]);
 
-        let mut b = HostParams::default();
+        let mut b = HostParams::new(&DefaultAlgorithms::default());
         b.bind_address = Some(String::from("pluto"));
         b.bind_interface = Some(String::from("tun0"));
-        b.ciphers = Algorithms::Set(vec!["c".to_string(), "d".to_string()]);
-        b.mac = Algorithms::Set(vec!["e".to_string(), "f".to_string()]);
+        b.ciphers
+            .apply(AlgorithmsRule::from_str("c,d").expect("parse error"));
 
         params.overwrite_if_none(&b);
         assert_eq!(params.bind_address.unwrap(), "pippo");
@@ -195,43 +250,8 @@ mod test {
 
         // algos
         assert_eq!(
-            params.ciphers.algos(),
-            vec!["a".to_string(), "b".to_string()]
+            params.ciphers.algorithms(),
+            vec!["c".to_string(), "d".to_string()]
         );
-        assert_eq!(params.mac.algos(), vec!["e".to_string(), "f".to_string()]);
-    }
-
-    #[test]
-    fn test_should_overwrite_if_none_plus_algos() {
-        let mut params = HostParams::default();
-        params.ciphers = Algorithms::Set(vec!["a".to_string(), "b".to_string()]);
-
-        let mut b = HostParams::default();
-        b.ciphers = Algorithms::Append(vec!["c".to_string(), "d".to_string()]);
-
-        params.overwrite_if_none(&b);
-
-        assert_eq!(
-            params.ciphers.algos(),
-            vec![
-                "a".to_string(),
-                "b".to_string(),
-                "c".to_string(),
-                "d".to_string()
-            ]
-        );
-    }
-
-    #[test]
-    fn test_should_overwrite_if_none_minus_algos() {
-        let mut params = HostParams::default();
-        params.ciphers = Algorithms::Set(vec!["a".to_string(), "b".to_string()]);
-
-        let mut b = HostParams::default();
-        b.ciphers = Algorithms::Exclude(vec!["a".to_string()]);
-
-        params.overwrite_if_none(&b);
-
-        assert_eq!(params.ciphers.algos(), vec!["b".to_string(),]);
     }
 }

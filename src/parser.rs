@@ -13,7 +13,7 @@ use glob::glob;
 use thiserror::Error;
 
 use super::{Host, HostClause, HostParams, SshConfig};
-use crate::Algorithms;
+use crate::params::AlgorithmsRule;
 
 // modules
 mod field;
@@ -30,6 +30,8 @@ pub enum SshParserError {
     ExpectedPort,
     #[error("expected unsigned value")]
     ExpectedUnsigned,
+    #[error("expected algorithms")]
+    ExpectedAlgorithms,
     #[error("expected path")]
     ExpectedPath,
     #[error("IO error: {0}")]
@@ -78,7 +80,7 @@ impl SshConfigParser {
         // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1051-L1054
         config.hosts.push(Host::new(
             vec![HostClause::new(String::from("*"), false)],
-            HostParams::default(),
+            HostParams::new(&config.default_algorithms),
         ));
 
         // Current host pointer
@@ -113,7 +115,7 @@ impl SshConfigParser {
             // If field is block, init a new block
             if field == Field::Host {
                 // Pass `ignore_unknown` from global overrides down into the tokenizer.
-                let mut params = HostParams::default();
+                let mut params = HostParams::new(&config.default_algorithms);
                 params.ignore_unknown = config.hosts[0].params.ignore_unknown.clone();
                 let pattern = Self::parse_host(args)?;
                 trace!("Adding new host: {pattern:?}",);
@@ -175,9 +177,9 @@ impl SshConfigParser {
                 params.bind_interface = Some(value);
             }
             Field::CaSignatureAlgorithms => {
-                let value = Self::parse_algos(args)?;
-                trace!("ca_signature_algorithms: {value:?}",);
-                params.ca_signature_algorithms = value;
+                let rule = Self::parse_algos(args)?;
+                trace!("ca_signature_algorithms: {rule:?}",);
+                params.ca_signature_algorithms.apply(rule);
             }
             Field::CertificateFile => {
                 let value = Self::parse_path(args)?;
@@ -185,9 +187,9 @@ impl SshConfigParser {
                 params.certificate_file = Some(value);
             }
             Field::Ciphers => {
-                let value = Self::parse_algos(args)?;
-                trace!("ciphers: {value:?}",);
-                params.ciphers = value;
+                let rule = Self::parse_algos(args)?;
+                trace!("ciphers: {rule:?}",);
+                params.ciphers.apply(rule);
             }
             Field::Compression => {
                 let value = Self::parse_boolean(args)?;
@@ -206,9 +208,9 @@ impl SshConfigParser {
             }
             Field::Host => { /* already handled before */ }
             Field::HostKeyAlgorithms => {
-                let value = Self::parse_algos(args)?;
-                trace!("host_key_algorithm: {value:?}",);
-                params.host_key_algorithms = value;
+                let rule = Self::parse_algos(args)?;
+                trace!("host_key_algorithm: {rule:?}",);
+                params.host_key_algorithms.apply(rule);
             }
             Field::HostName => {
                 let value = Self::parse_string(args)?;
@@ -229,14 +231,14 @@ impl SshConfigParser {
                 params.ignore_unknown = Some(value);
             }
             Field::KexAlgorithms => {
-                let value = Self::parse_algos(args)?;
-                trace!("kex_algorithms: {value:?}",);
-                params.kex_algorithms = value;
+                let rule = Self::parse_algos(args)?;
+                trace!("kex_algorithms: {rule:?}",);
+                params.kex_algorithms.apply(rule);
             }
             Field::Mac => {
-                let value = Self::parse_algos(args)?;
-                trace!("mac: {value:?}",);
-                params.mac = value;
+                let rule = Self::parse_algos(args)?;
+                trace!("mac: {rule:?}",);
+                params.mac.apply(rule);
             }
             Field::Port => {
                 let value = Self::parse_port(args)?;
@@ -244,9 +246,9 @@ impl SshConfigParser {
                 params.port = Some(value);
             }
             Field::PubkeyAcceptedAlgorithms => {
-                let value = Self::parse_algos(args)?;
-                trace!("pubkey_accepted_algorithms: {value:?}",);
-                params.pubkey_accepted_algorithms = value;
+                let rule = Self::parse_algos(args)?;
+                trace!("pubkey_accepted_algorithms: {rule:?}",);
+                params.pubkey_accepted_algorithms.apply(rule);
             }
             Field::PubkeyAuthentication => {
                 let value = Self::parse_boolean(args)?;
@@ -417,10 +419,10 @@ impl SshConfigParser {
     }
 
     /// Parse algorithms argument
-    fn parse_algos(args: Vec<String>) -> SshParserResult<Algorithms> {
+    fn parse_algos(args: Vec<String>) -> SshParserResult<AlgorithmsRule> {
         let first = args.first().ok_or(SshParserError::MissingArgument)?;
 
-        Algorithms::from_str(first)
+        AlgorithmsRule::from_str(first)
     }
 
     /// Parse comma separated list arguments
@@ -532,6 +534,7 @@ mod test {
     use tempfile::NamedTempFile;
 
     use super::*;
+    use crate::DefaultAlgorithms;
 
     #[test]
     fn should_parse_configuration() -> Result<(), SshParserError> {
@@ -539,7 +542,16 @@ mod test {
         let temp = create_ssh_config();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
-        let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT)?;
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms {
+                ca_signature_algorithms: vec![],
+                ciphers: vec![],
+                host_key_algorithms: vec![],
+                kex_algorithms: vec![],
+                mac: vec![],
+                pubkey_accepted_algorithms: vec!["omar-crypt".to_string()],
+            })
+            .parse(&mut reader, ParseRule::STRICT)?;
 
         // Query openssh cmdline overrides (options preceding the first `Host` section,
         // overriding all following options)
@@ -556,17 +568,20 @@ mod test {
             Duration::from_secs(40)
         );
         assert_eq!(params.tcp_keep_alive.unwrap(), true);
-        assert_eq!(params.ciphers.algos(), &["a-manella", "blowfish"]);
+        assert_eq!(params.ciphers.algorithms(), &["a-manella", "blowfish"]);
         assert_eq!(
-            params.pubkey_accepted_algorithms.algos(),
+            params.pubkey_accepted_algorithms.algorithms(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
         // Query explicit all-hosts fallback options (`Host *`)
-        assert_eq!(params.ca_signature_algorithms.algos(), &["random"]);
-        assert_eq!(params.host_key_algorithms.algos(), &["luigi", "mario",]);
-        assert_eq!(params.kex_algorithms.algos(), &["desu", "gigi",]);
-        assert_eq!(params.mac.algos(), &["concorde"]);
+        assert_eq!(params.ca_signature_algorithms.algorithms(), &["random"]);
+        assert_eq!(
+            params.host_key_algorithms.algorithms(),
+            &["luigi", "mario",]
+        );
+        assert_eq!(params.kex_algorithms.algorithms(), &["desu", "gigi",]);
+        assert_eq!(params.mac.algorithms(), &["concorde"]);
         assert!(params.bind_address.is_none());
 
         // Query 172.26.104.4, yielding cmdline overrides,
@@ -585,23 +600,20 @@ mod test {
 
         // all-hosts fallback options, merged with host-specific options
         assert_eq!(
-            params_172_26_104_4.ca_signature_algorithms.algos(),
+            params_172_26_104_4.ca_signature_algorithms.algorithms(),
             &["random"]
         );
         assert_eq!(
-            params_172_26_104_4.ciphers.algos(),
-            &[
-                "a-manella",
-                "blowfish",
-                "coi-piedi",
-                "cazdecan",
-                "triestin-stretto",
-            ]
+            params_172_26_104_4.ciphers.algorithms(),
+            &["a-manella", "blowfish",]
         );
-        assert_eq!(params_172_26_104_4.mac.algos(), &["spyro", "deoxys"]); // use subconfig; defined before * macs
+        assert_eq!(params_172_26_104_4.mac.algorithms(), &["spyro", "deoxys"]); // use subconfig; defined before * macs
         assert_eq!(
-            params_172_26_104_4.pubkey_accepted_algorithms,
-            Algorithms::Exclude(vec!["omar-crypt".to_string()])
+            params_172_26_104_4
+                .pubkey_accepted_algorithms
+                .algorithms()
+                .is_empty(), // should have removed omar-crypt
+            true
         );
         assert_eq!(
             params_172_26_104_4.bind_address.as_deref().unwrap(),
@@ -635,19 +647,19 @@ mod test {
 
         // all-hosts fallback options
         assert_eq!(
-            params_tostapane.ca_signature_algorithms.algos(),
+            params_tostapane.ca_signature_algorithms.algorithms(),
             &["random"]
         );
         assert_eq!(
-            params_tostapane.ciphers.algos(),
+            params_tostapane.ciphers.algorithms(),
             &["a-manella", "blowfish",]
         );
         assert_eq!(
-            params_tostapane.mac,
-            Algorithms::Append(vec!["spyro".to_string(), "deoxys".to_string(),])
+            params_tostapane.mac.algorithms(),
+            vec!["spyro".to_string(), "deoxys".to_string(),]
         );
         assert_eq!(
-            params_tostapane.pubkey_accepted_algorithms.algos(),
+            params_tostapane.pubkey_accepted_algorithms.algorithms(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
@@ -669,16 +681,16 @@ mod test {
 
         // all-hosts fallback options
         assert_eq!(
-            params_192_168_1_30.ca_signature_algorithms.algos(),
+            params_192_168_1_30.ca_signature_algorithms.algorithms(),
             &["random"]
         );
         assert_eq!(
-            params_192_168_1_30.ciphers.algos(),
+            params_192_168_1_30.ciphers.algorithms(),
             &["a-manella", "blowfish"]
         );
-        assert_eq!(params_192_168_1_30.mac.algos(), &["concorde"]);
+        assert_eq!(params_192_168_1_30.mac.algorithms(), &["concorde"]);
         assert_eq!(
-            params_192_168_1_30.pubkey_accepted_algorithms.algos(),
+            params_192_168_1_30.pubkey_accepted_algorithms.algorithms(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
@@ -691,7 +703,9 @@ mod test {
         let temp = create_ssh_config_with_unknown_fields();
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
-        let _config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)?;
+        let _config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)?;
 
         Ok(())
     }
@@ -704,6 +718,7 @@ mod test {
         let mut reader = BufReader::new(file);
         assert!(matches!(
             SshConfig::default()
+                .default_algorithms(DefaultAlgorithms::empty())
                 .parse(&mut reader, ParseRule::STRICT)
                 .unwrap_err(),
             SshParserError::UnknownField(..)
@@ -717,6 +732,7 @@ mod test {
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
         let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
             .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
             .unwrap();
 
@@ -734,6 +750,7 @@ mod test {
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
         let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
             .parse(&mut reader, ParseRule::STRICT)
             .unwrap();
 
@@ -769,6 +786,7 @@ mod test {
         let file = File::open(temp.path()).expect("Failed to open tempfile");
         let mut reader = BufReader::new(file);
         let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
             .parse(&mut reader, ParseRule::STRICT)
             .unwrap();
 
@@ -781,7 +799,7 @@ mod test {
     #[test]
     fn should_update_host_bind_address() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::BindAddress,
             vec![String::from("127.0.0.1")],
@@ -795,7 +813,7 @@ mod test {
     #[test]
     fn should_update_host_bind_interface() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::BindInterface,
             vec![String::from("aaa")],
@@ -809,7 +827,7 @@ mod test {
     #[test]
     fn should_update_host_ca_signature_algos() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::CaSignatureAlgorithms,
             vec![String::from("a,b,c")],
@@ -817,7 +835,7 @@ mod test {
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            host.params.ca_signature_algorithms.algos(),
+            host.params.ca_signature_algorithms.algorithms(),
             &["a", "b", "c"]
         );
         Ok(())
@@ -826,7 +844,7 @@ mod test {
     #[test]
     fn should_update_host_certificate_file() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::CertificateFile,
             vec![String::from("/tmp/a.crt")],
@@ -843,21 +861,21 @@ mod test {
     #[test]
     fn should_update_host_ciphers() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::Ciphers,
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(host.params.ciphers.algos(), &["a", "b", "c"]);
+        assert_eq!(host.params.ciphers.algorithms(), &["a", "b", "c"]);
         Ok(())
     }
 
     #[test]
     fn should_update_host_compression() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::Compression,
             vec![String::from("yes")],
@@ -871,7 +889,7 @@ mod test {
     #[test]
     fn should_update_host_connection_attempts() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::ConnectionAttempts,
             vec![String::from("4")],
@@ -885,7 +903,7 @@ mod test {
     #[test]
     fn should_update_host_connection_timeout() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::ConnectTimeout,
             vec![String::from("10")],
@@ -902,21 +920,24 @@ mod test {
     #[test]
     fn should_update_host_key_algorithms() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::HostKeyAlgorithms,
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(host.params.host_key_algorithms.algos(), &["a", "b", "c"]);
+        assert_eq!(
+            host.params.host_key_algorithms.algorithms(),
+            &["a", "b", "c"]
+        );
         Ok(())
     }
 
     #[test]
     fn should_update_host_host_name() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::HostName,
             vec![String::from("192.168.1.1")],
@@ -930,7 +951,7 @@ mod test {
     #[test]
     fn should_update_host_ignore_unknown() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::IgnoreUnknown,
             vec![String::from("a,b,c")],
@@ -947,35 +968,35 @@ mod test {
     #[test]
     fn should_update_kex_algorithms() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::KexAlgorithms,
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(host.params.kex_algorithms.algos(), &["a", "b", "c"]);
+        assert_eq!(host.params.kex_algorithms.algorithms(), &["a", "b", "c"]);
         Ok(())
     }
 
     #[test]
     fn should_update_host_mac() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::Mac,
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
-        assert_eq!(host.params.mac.algos(), &["a", "b", "c"]);
+        assert_eq!(host.params.mac.algorithms(), &["a", "b", "c"]);
         Ok(())
     }
 
     #[test]
     fn should_update_host_port() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::Port,
             vec![String::from("2222")],
@@ -989,7 +1010,7 @@ mod test {
     #[test]
     fn should_update_host_pubkey_accepted_algos() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::PubkeyAcceptedAlgorithms,
             vec![String::from("a,b,c")],
@@ -997,7 +1018,7 @@ mod test {
             ParseRule::ALLOW_UNKNOWN_FIELDS,
         )?;
         assert_eq!(
-            host.params.pubkey_accepted_algorithms.algos(),
+            host.params.pubkey_accepted_algorithms.algorithms(),
             &["a", "b", "c"]
         );
         Ok(())
@@ -1006,7 +1027,7 @@ mod test {
     #[test]
     fn should_update_host_pubkey_authentication() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::PubkeyAuthentication,
             vec![String::from("yes")],
@@ -1020,7 +1041,7 @@ mod test {
     #[test]
     fn should_update_host_remote_forward() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::RemoteForward,
             vec![String::from("3005")],
@@ -1034,7 +1055,7 @@ mod test {
     #[test]
     fn should_update_host_server_alive_interval() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::ServerAliveInterval,
             vec![String::from("40")],
@@ -1051,7 +1072,7 @@ mod test {
     #[test]
     fn should_update_host_tcp_keep_alive() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::TcpKeepAlive,
             vec![String::from("no")],
@@ -1065,7 +1086,7 @@ mod test {
     #[test]
     fn should_update_host_user() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::User,
             vec![String::from("pippo")],
@@ -1079,7 +1100,7 @@ mod test {
     #[test]
     fn should_not_update_host_if_unknown() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         let result = SshConfigParser::update_host(
             Field::AddKeysToAgent,
             vec![String::from("yes")],
@@ -1092,14 +1113,14 @@ mod test {
             e => e,
         }?;
 
-        assert_eq!(host.params, HostParams::default());
+        assert_eq!(host.params, HostParams::new(&DefaultAlgorithms::empty()));
         Ok(())
     }
 
     #[test]
     fn should_update_host_if_unsupported() -> Result<(), SshParserError> {
         crate::test_log();
-        let mut host = Host::new(vec![], HostParams::default());
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         let result = SshConfigParser::update_host(
             Field::AddKeysToAgent,
             vec![String::from("yes")],
@@ -1115,7 +1136,7 @@ mod test {
             e => e,
         }?;
 
-        assert_eq!(host.params, HostParams::default());
+        assert_eq!(host.params, HostParams::new(&DefaultAlgorithms::empty()));
         Ok(())
     }
 
@@ -1192,7 +1213,7 @@ mod test {
         crate::test_log();
         assert_eq!(
             SshConfigParser::parse_algos(vec![String::from("a,b,c,d")])?,
-            Algorithms::Set(vec![
+            AlgorithmsRule::Set(vec![
                 "a".to_string(),
                 "b".to_string(),
                 "c".to_string(),
@@ -1202,12 +1223,12 @@ mod test {
 
         assert_eq!(
             SshConfigParser::parse_algos(vec![String::from("a")])?,
-            Algorithms::Set(vec!["a".to_string()])
+            AlgorithmsRule::Set(vec!["a".to_string()])
         );
 
         assert_eq!(
             SshConfigParser::parse_algos(vec![String::from("+a,b")])?,
-            Algorithms::Append(vec!["a".to_string(), "b".to_string()])
+            AlgorithmsRule::Append(vec!["a".to_string(), "b".to_string()])
         );
 
         Ok(())
@@ -1543,6 +1564,7 @@ Host *
         let mut reader = BufReader::new(file);
 
         let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
             .parse(&mut reader, ParseRule::STRICT)
             .expect("Failed to parse config");
 
@@ -1557,7 +1579,7 @@ Host *
             Duration::from_secs(40) // first read
         );
         assert_eq!(glob_params.tcp_keep_alive.unwrap(), true);
-        assert_eq!(glob_params.ciphers.algos(), &["a-manella", "blowfish",]);
+        assert_eq!(glob_params.ciphers.algorithms().is_empty(), true);
 
         // verify tostapane
         let tostapane_params = config.query("tostapane");
@@ -1572,7 +1594,7 @@ Host *
         assert_eq!(tostapane_params.tcp_keep_alive.unwrap(), true);
         // verify ciphers
         assert_eq!(
-            tostapane_params.ciphers.algos(),
+            tostapane_params.ciphers.algorithms(),
             &[
                 "a-manella",
                 "blowfish",
@@ -1612,7 +1634,6 @@ Compression yes
 ConnectionAttempts          10
 ConnectTimeout 60
 ServerAliveInterval 40
-Ciphers     +a-manella,blowfish
 Include {inc1}
 
 # Let's start defining some hosts

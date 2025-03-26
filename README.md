@@ -66,6 +66,7 @@
     - [Reading unsupported fields](#reading-unsupported-fields)
   - [How host parameters are resolved](#how-host-parameters-are-resolved)
     - [Resolvers examples](#resolvers-examples)
+  - [Configuring default algorithms](#configuring-default-algorithms)
     - [Examples](#examples)
   - [Support the developer ☕](#support-the-developer-)
   - [Contributing and issues 🤝🏻](#contributing-and-issues-)
@@ -153,35 +154,46 @@ fn configure_session(session: &mut Session, params: &HostParams) {
         session.set_keepalive(true, interval);
     }
     // KEX
-    if let Err(err) =
-        session.method_pref(MethodType::Kex, params.kex_algorithms.to_string().as_str())
-    {
+    if let Err(err) = session.method_pref(
+        MethodType::Kex,
+        params.kex_algorithms.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set KEX algorithms: {}", err);
     }
 
     // host key
     if let Err(err) = session.method_pref(
         MethodType::HostKey,
-        params.host_key_algorithms.to_string().as_str(),
+        params.host_key_algorithms.algorithms().join(",").as_str(),
     ) {
         panic!("Could not set host key algorithms: {}", err);
     }
 
     // ciphers
-    if let Err(err) = session.method_pref(MethodType::CryptCs, params.ciphers.to_string().as_str())
-    {
+    if let Err(err) = session.method_pref(
+        MethodType::CryptCs,
+        params.ciphers.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set crypt algorithms (client-server): {}", err);
     }
-    if let Err(err) = session.method_pref(MethodType::CryptSc, params.ciphers.to_string().as_str())
-    {
+    if let Err(err) = session.method_pref(
+        MethodType::CryptSc,
+        params.ciphers.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set crypt algorithms (server-client): {}", err);
     }
 
     // mac
-    if let Err(err) = session.method_pref(MethodType::MacCs, params.mac.to_string().as_str()) {
+    if let Err(err) = session.method_pref(
+        MethodType::MacCs,
+        params.mac.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set MAC algorithms (client-server): {}", err);
     }
-    if let Err(err) = session.method_pref(MethodType::MacSc, params.mac.to_string().as_str()) {
+    if let Err(err) = session.method_pref(
+        MethodType::MacSc,
+        params.mac.algorithms().join(",").as_str(),
+    ) {
         panic!("Could not set MAC algorithms (server-client): {}", err);
     }
 }
@@ -235,7 +247,7 @@ This means that:
 1. The first obtained value parsing the configuration top-down will be used
 2. Host specific rules ARE not overriding default ones if they are not the first obtained value
 3. If you want to achieve default values to be less specific than host specific ones, you should put the default values at the end of the configuration file using `Host *`.
-4. Algorithms, so `KexAlgorithms`, `Ciphers`, `MACs` and `HostKeyAlgorithms` use a different resolvers which supports appending, excluding and heading insertions, as described in the man page at ciphers: <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>.
+4. Algorithms, so `KexAlgorithms`, `Ciphers`, `MACs` and `HostKeyAlgorithms` use a different resolvers which supports appending, excluding and heading insertions, as described in the man page at ciphers: <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>. They are in case appended to default algorithms, which are either fetched from the openssh source code or set with a constructor. See [configuring default algorithms](#configuring-default-algorithms) for more information.
 
 ### Resolvers examples
 
@@ -261,13 +273,15 @@ If we get rules for `192.168.1.1`, compression will be `no`, because it's the fi
 If we get rules for `172.168.1.1`, compression will be `yes`, because it's the first obtained value MATCHING the host rule.
 
 ```ssh
-Ciphers a,b
-
 Host 192.168.1.1
     Ciphers +c
 ```
 
 If we get rules for `192.168.1.1`, ciphers will be `a,b,c`, because default is set to `a,b` and `+c` means append `c` to the list.
+
+---
+
+## Configuring default algorithms
 
 ---
 
