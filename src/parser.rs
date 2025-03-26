@@ -13,6 +13,7 @@ use glob::glob;
 use thiserror::Error;
 
 use super::{Host, HostClause, HostParams, SshConfig};
+use crate::DefaultAlgorithms;
 use crate::params::AlgorithmsRule;
 
 // modules
@@ -126,7 +127,13 @@ impl SshConfigParser {
                 current_host = config.hosts.last_mut().unwrap();
             } else {
                 // Update field
-                match Self::update_host(field, args, current_host, rules) {
+                match Self::update_host(
+                    field,
+                    args,
+                    current_host,
+                    rules,
+                    &config.default_algorithms,
+                ) {
                     Ok(()) => Ok(()),
                     // If we're allowing unsupported fields to be parsed, add them to the map
                     Err(SshParserError::UnsupportedField(field, args))
@@ -162,6 +169,7 @@ impl SshConfigParser {
         args: Vec<String>,
         host: &mut Host,
         rules: ParseRule,
+        default_algos: &DefaultAlgorithms,
     ) -> SshParserResult<()> {
         trace!("parsing field {field:?} with args {args:?}",);
         let params = &mut host.params;
@@ -218,7 +226,7 @@ impl SshConfigParser {
                 params.host_name = Some(value);
             }
             Field::Include => {
-                Self::include_files(args, host, rules)?;
+                Self::include_files(args, host, rules, default_algos)?;
             }
             Field::IdentityFile => {
                 let value = Self::parse_path_list(args)?;
@@ -359,7 +367,12 @@ impl SshConfigParser {
     }
 
     /// include a file by parsing it and updating host rules by merging the read config to the current one for the host
-    fn include_files(args: Vec<String>, host: &mut Host, rules: ParseRule) -> SshParserResult<()> {
+    fn include_files(
+        args: Vec<String>,
+        host: &mut Host,
+        rules: ParseRule,
+        default_algos: &DefaultAlgorithms,
+    ) -> SshParserResult<()> {
         let path_match = Self::parse_string(args)?;
         trace!("include files: {path_match}",);
         let files = glob(&path_match)?;
@@ -368,7 +381,7 @@ impl SshConfigParser {
             let file = file?;
             trace!("including file: {}", file.display());
             let mut reader = BufReader::new(File::open(file)?);
-            let mut sub_config = SshConfig::default();
+            let mut sub_config = SshConfig::default().default_algorithms(default_algos.clone());
             Self::parse(&mut sub_config, &mut reader, rules)?;
 
             // merge sub-config into host
@@ -805,6 +818,7 @@ mod test {
             vec![String::from("127.0.0.1")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.bind_address.as_deref().unwrap(), "127.0.0.1");
         Ok(())
@@ -819,6 +833,7 @@ mod test {
             vec![String::from("aaa")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.bind_interface.as_deref().unwrap(), "aaa");
         Ok(())
@@ -833,6 +848,7 @@ mod test {
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(
             host.params.ca_signature_algorithms.algorithms(),
@@ -850,6 +866,7 @@ mod test {
             vec![String::from("/tmp/a.crt")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(
             host.params.certificate_file.as_deref().unwrap(),
@@ -867,6 +884,7 @@ mod test {
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.ciphers.algorithms(), &["a", "b", "c"]);
         Ok(())
@@ -881,6 +899,7 @@ mod test {
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.compression.unwrap(), true);
         Ok(())
@@ -895,6 +914,7 @@ mod test {
             vec![String::from("4")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.connection_attempts.unwrap(), 4);
         Ok(())
@@ -909,6 +929,7 @@ mod test {
             vec![String::from("10")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(
             host.params.connect_timeout.unwrap(),
@@ -926,6 +947,7 @@ mod test {
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(
             host.params.host_key_algorithms.algorithms(),
@@ -943,6 +965,7 @@ mod test {
             vec![String::from("192.168.1.1")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.host_name.as_deref().unwrap(), "192.168.1.1");
         Ok(())
@@ -957,6 +980,7 @@ mod test {
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(
             host.params.ignore_unknown.as_deref().unwrap(),
@@ -974,6 +998,7 @@ mod test {
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.kex_algorithms.algorithms(), &["a", "b", "c"]);
         Ok(())
@@ -988,6 +1013,7 @@ mod test {
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.mac.algorithms(), &["a", "b", "c"]);
         Ok(())
@@ -1002,6 +1028,7 @@ mod test {
             vec![String::from("2222")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.port.unwrap(), 2222);
         Ok(())
@@ -1016,6 +1043,7 @@ mod test {
             vec![String::from("a,b,c")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(
             host.params.pubkey_accepted_algorithms.algorithms(),
@@ -1033,6 +1061,7 @@ mod test {
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.pubkey_authentication.unwrap(), true);
         Ok(())
@@ -1047,6 +1076,7 @@ mod test {
             vec![String::from("3005")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.remote_forward.unwrap(), 3005);
         Ok(())
@@ -1061,6 +1091,7 @@ mod test {
             vec![String::from("40")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(
             host.params.server_alive_interval.unwrap(),
@@ -1078,6 +1109,7 @@ mod test {
             vec![String::from("no")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.tcp_keep_alive.unwrap(), false);
         Ok(())
@@ -1092,6 +1124,7 @@ mod test {
             vec![String::from("pippo")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         )?;
         assert_eq!(host.params.user.as_deref().unwrap(), "pippo");
         Ok(())
@@ -1106,6 +1139,7 @@ mod test {
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         );
 
         match result {
@@ -1126,6 +1160,7 @@ mod test {
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
         );
 
         match result {
