@@ -77,7 +77,7 @@ pub use params::HostParams;
 pub use parser::{ParseRule, SshParserError, SshParserResult};
 
 /// Describes the ssh configuration.
-/// Configuration is describes in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
+/// Configuration is described in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SshConfig {
     /// Rulesets for hosts.
@@ -92,25 +92,35 @@ impl fmt::Display for SshConfig {
 }
 
 impl SshConfig {
-    /// Query params for a certain host
-    pub fn query<S: AsRef<str>>(&self, host: S) -> HostParams {
+    /// Query params for a certain host. Returns [`HostParams`] for the host.
+    pub fn query<S: AsRef<str>>(&self, pattern: S) -> HostParams {
         let mut params = HostParams::default();
-        // iter keys, merge from lowest to highest precedence
-        for cfg_host in self.hosts.iter() {
-            if cfg_host.intersects(host.as_ref()) {
-                params.merge(&cfg_host.params);
+        // iter keys, overwrite if None top-down
+        for host in self.hosts.iter() {
+            if host.intersects(pattern.as_ref()) {
+                debug!(
+                    "Merging params for host: {:?} into params {params:?}",
+                    host.pattern
+                );
+                params.overwrite_if_none(&host.params);
+                trace!("Params after merge: {params:?}");
             }
         }
         // return calculated params
         params
     }
 
-    /// Parse stream and return parsed configuration or parser error
+    /// Get an iterator over the [`Host`]s which intersect with the given host pattern
+    pub fn intersecting_hosts(&self, pattern: &str) -> impl Iterator<Item = &'_ Host> {
+        self.hosts.iter().filter(|host| host.intersects(pattern))
+    }
+
+    /// Parse [`SshConfig`] from stream which implements [`BufRead`] and return parsed configuration or parser error
     pub fn parse(mut self, reader: &mut impl BufRead, rules: ParseRule) -> SshParserResult<Self> {
         parser::SshConfigParser::parse(&mut self, reader, rules).map(|_| self)
     }
 
-    /// Parse ~/.ssh/config file and return parsed configuration or parser error
+    /// Parse `~/.ssh/config`` file and return parsed configuration [`SshConfig`] or parser error
     pub fn parse_default_file(rules: ParseRule) -> SshParserResult<Self> {
         let ssh_folder = dirs::home_dir()
             .ok_or_else(|| {
@@ -127,6 +137,7 @@ impl SshConfig {
         Self::default().parse(&mut reader, rules)
     }
 
+    /// Get list of [`Host`]s in the configuration
     pub fn get_hosts(&self) -> &Vec<Host> {
         &self.hosts
     }

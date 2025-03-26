@@ -381,7 +381,7 @@ impl SshConfigParser {
                 }
                 trace!("merging sub-config for pattern: {pattern:?}",);
                 let params = sub_config.query(&pattern.pattern);
-                host.params.merge(&params);
+                host.params.overwrite_if_none(&params);
             }
         }
 
@@ -581,21 +581,27 @@ mod test {
         // Query 172.26.104.4, yielding cmdline overrides,
         // explicit `Host 192.168.*.* 172.26.*.* !192.168.1.30` options,
         // and all-hosts fallback options.
-        let params = config.query("172.26.104.4");
+        let params_172_26_104_4 = config.query("172.26.104.4");
 
         // cmdline overrides
-        assert_eq!(params.compression.unwrap(), true);
-        assert_eq!(params.connection_attempts.unwrap(), 10);
-        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
-        assert_eq!(params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(params_172_26_104_4.compression.unwrap(), true);
+        assert_eq!(params_172_26_104_4.connection_attempts.unwrap(), 10);
+        assert_eq!(
+            params_172_26_104_4.connect_timeout.unwrap(),
+            Duration::from_secs(60)
+        );
+        assert_eq!(params_172_26_104_4.tcp_keep_alive.unwrap(), true);
 
         // all-hosts fallback options, merged with host-specific options
         assert_eq!(
-            params.ca_signature_algorithms.as_deref().unwrap(),
+            params_172_26_104_4
+                .ca_signature_algorithms
+                .as_deref()
+                .unwrap(),
             &["random"]
         );
         assert_eq!(
-            params.ciphers.as_deref().unwrap(),
+            params_172_26_104_4.ciphers.as_deref().unwrap(),
             &[
                 "a-manella",
                 "blowfish",
@@ -604,72 +610,99 @@ mod test {
                 "triestin-stretto",
             ]
         );
-        assert_eq!(params.mac.as_deref().unwrap(), &["spyro", "deoxys"]);
+        assert_eq!(params_172_26_104_4.mac.as_deref().unwrap(), &["concorde"]);
         assert_eq!(
-            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            params_172_26_104_4
+                .pubkey_accepted_algorithms
+                .as_deref()
+                .unwrap(),
             &["desu", "fast-omar-crypt"]
         );
-        assert_eq!(params.bind_address.as_deref().unwrap(), "10.8.0.10");
-        assert_eq!(params.bind_interface.as_deref().unwrap(), "tun0");
-        assert_eq!(params.port.unwrap(), 2222);
         assert_eq!(
-            params.identity_file.as_deref().unwrap(),
+            params_172_26_104_4.bind_address.as_deref().unwrap(),
+            "10.8.0.10"
+        );
+        assert_eq!(
+            params_172_26_104_4.bind_interface.as_deref().unwrap(),
+            "tun0"
+        );
+        assert_eq!(params_172_26_104_4.port.unwrap(), 2222);
+        assert_eq!(
+            params_172_26_104_4.identity_file.as_deref().unwrap(),
             vec![
                 Path::new("/home/root/.ssh/pippo.key"),
                 Path::new("/home/root/.ssh/pluto.key")
             ]
         );
-        assert_eq!(params.user.as_deref().unwrap(), "omar");
+        assert_eq!(params_172_26_104_4.user.as_deref().unwrap(), "omar");
 
         // Query tostapane
-        let params = config.query("tostapane");
-        assert_eq!(params.compression.unwrap(), false);
-        assert_eq!(params.connection_attempts.unwrap(), 10);
-        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
-        assert_eq!(params.tcp_keep_alive.unwrap(), true);
-        assert_eq!(params.remote_forward.unwrap(), 88);
-        assert_eq!(params.user.as_deref().unwrap(), "ciro-esposito");
+        let params_tostapane = config.query("tostapane");
+        assert_eq!(params_tostapane.compression.unwrap(), true); // it takes the first value defined, which is `yes`
+        assert_eq!(params_tostapane.connection_attempts.unwrap(), 10);
+        assert_eq!(
+            params_tostapane.connect_timeout.unwrap(),
+            Duration::from_secs(60)
+        );
+        assert_eq!(params_tostapane.tcp_keep_alive.unwrap(), true);
+        assert_eq!(params_tostapane.remote_forward.unwrap(), 88);
+        assert_eq!(params_tostapane.user.as_deref().unwrap(), "ciro-esposito");
 
         // all-hosts fallback options
         assert_eq!(
-            params.ca_signature_algorithms.as_deref().unwrap(),
+            params_tostapane.ca_signature_algorithms.as_deref().unwrap(),
             &["random"]
         );
         assert_eq!(
-            params.ciphers.as_deref().unwrap(),
+            params_tostapane.ciphers.as_deref().unwrap(),
             &["a-manella", "blowfish",]
         );
-        assert_eq!(params.mac.as_deref().unwrap(), &["concorde"]);
         assert_eq!(
-            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            params_tostapane.mac.as_deref().unwrap(),
+            &["concorde", "spyro", "deoxys",]
+        );
+        assert_eq!(
+            params_tostapane
+                .pubkey_accepted_algorithms
+                .as_deref()
+                .unwrap(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
         // query 192.168.1.30
-        let params = config.query("192.168.1.30");
+        let params_192_168_1_30 = config.query("192.168.1.30");
 
         // host-specific options
-        assert_eq!(params.user.as_deref().unwrap(), "nutellaro");
-        assert_eq!(params.remote_forward.unwrap(), 123);
+        assert_eq!(params_192_168_1_30.user.as_deref().unwrap(), "nutellaro");
+        assert_eq!(params_192_168_1_30.remote_forward.unwrap(), 123);
 
         // cmdline overrides
-        assert_eq!(params.compression.unwrap(), true);
-        assert_eq!(params.connection_attempts.unwrap(), 10);
-        assert_eq!(params.connect_timeout.unwrap(), Duration::from_secs(60));
-        assert_eq!(params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(params_192_168_1_30.compression.unwrap(), true);
+        assert_eq!(params_192_168_1_30.connection_attempts.unwrap(), 10);
+        assert_eq!(
+            params_192_168_1_30.connect_timeout.unwrap(),
+            Duration::from_secs(60)
+        );
+        assert_eq!(params_192_168_1_30.tcp_keep_alive.unwrap(), true);
 
         // all-hosts fallback options
         assert_eq!(
-            params.ca_signature_algorithms.as_deref().unwrap(),
+            params_192_168_1_30
+                .ca_signature_algorithms
+                .as_deref()
+                .unwrap(),
             &["random"]
         );
         assert_eq!(
-            params.ciphers.as_deref().unwrap(),
+            params_192_168_1_30.ciphers.as_deref().unwrap(),
             &["a-manella", "blowfish"]
         );
-        assert_eq!(params.mac.as_deref().unwrap(), &["concorde"]);
+        assert_eq!(params_192_168_1_30.mac.as_deref().unwrap(), &["concorde"]);
         assert_eq!(
-            params.pubkey_accepted_algorithms.as_deref().unwrap(),
+            params_192_168_1_30
+                .pubkey_accepted_algorithms
+                .as_deref()
+                .unwrap(),
             &["desu", "omar-crypt", "fast-omar-crypt"]
         );
 
@@ -733,21 +766,21 @@ mod test {
             .to_string_lossy()
             .to_string();
 
-        let host_params = config.query("remote-host");
+        let remote_host = config.query("remote-host");
 
         // From `*-host`
         assert_eq!(
-            host_params.identity_file.unwrap()[0].as_path(),
-            Path::new(format!("{home_dir}/.ssh/id_rsa_bad").as_str())
+            remote_host.identity_file.unwrap()[0].as_path(),
+            Path::new(format!("{home_dir}/.ssh/id_rsa_good").as_str()) // because it's the first in the file
         );
 
         // From `remote-*`
-        assert_eq!(host_params.host_name.unwrap(), "hostname.com");
-        assert_eq!(host_params.user.unwrap(), "user");
+        assert_eq!(remote_host.host_name.unwrap(), "hostname.com");
+        assert_eq!(remote_host.user.unwrap(), "user");
 
         // From `*`
         assert_eq!(
-            host_params.connect_timeout.unwrap(),
+            remote_host.connect_timeout.unwrap(),
             Duration::from_secs(15)
         );
     }
@@ -1433,6 +1466,7 @@ Host tostapane
     Compression no
     Pippo yes
     Pluto 56
+    Macs +spyro,deoxys
 
 Host    192.168.1.30
     User    nutellaro
@@ -1524,7 +1558,7 @@ Host *
         );
         assert_eq!(
             glob_params.server_alive_interval.unwrap(),
-            Duration::from_secs(60)
+            Duration::from_secs(40) // first read
         );
         assert_eq!(glob_params.tcp_keep_alive.unwrap(), true);
         assert_eq!(
@@ -1536,11 +1570,11 @@ Host *
         let tostapane_params = config.query("tostapane");
         assert_eq!(
             tostapane_params.connect_timeout.unwrap(),
-            Duration::from_secs(180)
+            Duration::from_secs(60) // first read
         );
         assert_eq!(
             tostapane_params.server_alive_interval.unwrap(),
-            Duration::from_secs(180)
+            Duration::from_secs(40) // first read
         );
         assert_eq!(tostapane_params.tcp_keep_alive.unwrap(), true);
         // verify ciphers

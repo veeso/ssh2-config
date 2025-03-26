@@ -65,7 +65,7 @@ pub struct HostParams {
 }
 
 impl HostParams {
-    /// Return whether `param` is in ignored list
+    /// Return whether a certain `param` is in the ignored list
     pub(crate) fn ignored(&self, param: &str) -> bool {
         self.ignore_unknown
             .as_ref()
@@ -73,7 +73,61 @@ impl HostParams {
             .unwrap_or(false)
     }
 
-    /// Override current params with params of `b`
+    /// Given a [`HostParams`] object `b`, it will overwrite all the params from `self` only if they are [`None`]
+    pub fn overwrite_if_none(&mut self, b: &Self) {
+        self.bind_address = self.bind_address.clone().or_else(|| b.bind_address.clone());
+        self.bind_interface = self
+            .bind_interface
+            .clone()
+            .or_else(|| b.bind_interface.clone());
+        self.certificate_file = self
+            .certificate_file
+            .clone()
+            .or_else(|| b.certificate_file.clone());
+        self.compression = self.compression.or_else(|| b.compression);
+        self.connection_attempts = self.connection_attempts.or_else(|| b.connection_attempts);
+        self.connect_timeout = self.connect_timeout.or_else(|| b.connect_timeout);
+        self.host_name = self.host_name.clone().or_else(|| b.host_name.clone());
+        self.identity_file = self
+            .identity_file
+            .clone()
+            .or_else(|| b.identity_file.clone());
+        self.ignore_unknown = self
+            .ignore_unknown
+            .clone()
+            .or_else(|| b.ignore_unknown.clone());
+        self.port = self.port.or_else(|| b.port);
+        self.pubkey_authentication = self
+            .pubkey_authentication
+            .or_else(|| b.pubkey_authentication);
+        self.remote_forward = self.remote_forward.or_else(|| b.remote_forward);
+        self.server_alive_interval = self
+            .server_alive_interval
+            .or_else(|| b.server_alive_interval);
+        #[cfg(target_os = "macos")]
+        {
+            self.use_keychain = self.use_keychain.or_else(|| b.use_keychain);
+        }
+        self.tcp_keep_alive = self.tcp_keep_alive.or_else(|| b.tcp_keep_alive);
+        self.user = self.user.clone().or_else(|| b.user.clone());
+        for (ignored_field, args) in &b.ignored_fields {
+            if !self.ignored_fields.contains_key(ignored_field) {
+                self.ignored_fields
+                    .insert(ignored_field.to_owned(), args.to_owned());
+            }
+        }
+        for (unsupported_field, args) in &b.unsupported_fields {
+            if !self.unsupported_fields.contains_key(unsupported_field) {
+                self.unsupported_fields
+                    .insert(unsupported_field.to_owned(), args.to_owned());
+            }
+        }
+
+        // finally merge the algorithms
+        self.merge_all_algorithms(b);
+    }
+
+    /// Given a [`HostParams`] object `b`, it will overwrite all the params from `self` if they are [`Some`].
     pub fn merge(&mut self, b: &Self) {
         if let Some(bind_address) = b.bind_address.as_deref() {
             self.bind_address = Some(bind_address.to_owned());
@@ -81,23 +135,8 @@ impl HostParams {
         if let Some(bind_interface) = b.bind_interface.as_deref() {
             self.bind_interface = Some(bind_interface.to_owned());
         }
-        if let Some(ca_signature_algorithms) = b.ca_signature_algorithms.as_deref() {
-            if self.ca_signature_algorithms.is_none() {
-                self.ca_signature_algorithms = Some(Vec::new());
-            }
-            Self::resolve_algorithms(
-                self.ca_signature_algorithms.as_mut().unwrap(),
-                ca_signature_algorithms,
-            );
-        }
         if let Some(certificate_file) = b.certificate_file.as_deref() {
             self.certificate_file = Some(certificate_file.to_owned());
-        }
-        if let Some(ciphers) = b.ciphers.as_deref() {
-            if self.ciphers.is_none() {
-                self.ciphers = Some(Vec::new());
-            }
-            Self::resolve_algorithms(self.ciphers.as_mut().unwrap(), ciphers);
         }
         if let Some(compression) = b.compression {
             self.compression = Some(compression);
@@ -112,15 +151,6 @@ impl HostParams {
         if let Some(connect_timeout) = b.connect_timeout {
             self.connect_timeout = Some(connect_timeout);
         }
-        if let Some(host_key_algorithms) = b.host_key_algorithms.as_deref() {
-            if self.host_key_algorithms.is_none() {
-                self.host_key_algorithms = Some(Vec::new());
-            }
-            Self::resolve_algorithms(
-                self.host_key_algorithms.as_mut().unwrap(),
-                host_key_algorithms,
-            );
-        }
         if let Some(host_name) = b.host_name.as_deref() {
             self.host_name = Some(host_name.to_owned());
         }
@@ -130,29 +160,8 @@ impl HostParams {
         if let Some(ignore_unknown) = b.ignore_unknown.as_deref() {
             self.ignore_unknown = Some(ignore_unknown.to_owned());
         }
-        if let Some(kex_algorithms) = b.kex_algorithms.as_deref() {
-            if self.kex_algorithms.is_none() {
-                self.kex_algorithms = Some(Vec::new());
-            }
-            Self::resolve_algorithms(self.kex_algorithms.as_mut().unwrap(), kex_algorithms);
-        }
-        if let Some(mac) = b.mac.as_deref() {
-            if self.mac.is_none() {
-                self.mac = Some(Vec::new());
-            }
-            Self::resolve_algorithms(self.mac.as_mut().unwrap(), mac);
-        }
         if let Some(port) = b.port {
             self.port = Some(port);
-        }
-        if let Some(pubkey_accepted_algorithms) = b.pubkey_accepted_algorithms.as_deref() {
-            if self.pubkey_accepted_algorithms.is_none() {
-                self.pubkey_accepted_algorithms = Some(Vec::new());
-            }
-            Self::resolve_algorithms(
-                self.pubkey_accepted_algorithms.as_mut().unwrap(),
-                pubkey_accepted_algorithms,
-            );
         }
         if let Some(pubkey_authentication) = b.pubkey_authentication {
             self.pubkey_authentication = Some(pubkey_authentication);
@@ -186,12 +195,51 @@ impl HostParams {
                     .insert(unsupported_field.to_owned(), args.to_owned());
             }
         }
+
+        // finally merge the algorithms
+        self.merge_all_algorithms(b);
+    }
+
+    /// Given a [`HostParams`] object `b`, it will merge all the algorithms from `self` and `b`.
+    ///
+    /// The merge is done following the [`resolve_algorithms`] logic
+    ///
+    /// Reference <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>
+    fn merge_all_algorithms(&mut self, b: &Self) {
+        Self::merge_algorithm(
+            &mut self.ca_signature_algorithms,
+            &b.ca_signature_algorithms,
+        );
+        Self::merge_algorithm(&mut self.ciphers, &b.ciphers);
+        Self::merge_algorithm(&mut self.host_key_algorithms, &b.host_key_algorithms);
+        Self::merge_algorithm(&mut self.kex_algorithms, &b.kex_algorithms);
+        Self::merge_algorithm(&mut self.mac, &b.mac);
+        Self::merge_algorithm(
+            &mut self.pubkey_accepted_algorithms,
+            &b.pubkey_accepted_algorithms,
+        );
+    }
+
+    /// Given the current algorithms list option, and the incoming algorithms list option, it will merge the two lists
+    ///
+    /// Merge algorithms following the [`resolve_algorithms`] logic
+    ///
+    /// Reference <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>
+    fn merge_algorithm(current: &mut Option<Vec<String>>, b: &Option<Vec<String>>) {
+        if let Some(algos) = b.as_deref() {
+            if current.is_none() {
+                *current = Some(Vec::new());
+            }
+            Self::resolve_algorithms(current.as_mut().unwrap(), algos);
+        }
     }
 
     /// Resolve algorithms list.
     /// if the first argument starts with `+`, then the provided algorithms are PUSHED onto existing list
     /// if the first argument starts with `-`, then the provided algorithms are REMOVED from existing list
     /// otherwise the provided list will JUST replace the existing list
+    ///
+    /// Reference <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Ciphers>
     fn resolve_algorithms(current_list: &mut Vec<String>, algos: &[String]) {
         if algos.is_empty() {
             return;
@@ -214,7 +262,8 @@ impl HostParams {
                     .chain(algos[1..].iter())
                     .any(|remove| remove == algo)
             });
-        } else {
+        } else if current_list.is_empty() {
+            // OVERWRITE ONLY IF EMPTY!!!
             *current_list = algos.to_vec();
         }
     }
@@ -252,6 +301,64 @@ mod test {
         #[cfg(target_os = "macos")]
         assert!(params.use_keychain.is_none());
         assert!(params.tcp_keep_alive.is_none());
+    }
+
+    #[test]
+    fn test_should_overwrite_if_none() {
+        let mut params = HostParams::default();
+        params.bind_address = Some(String::from("pippo"));
+        params.ciphers = Some(vec!["a".to_string(), "b".to_string()]);
+
+        let mut b = HostParams::default();
+        b.bind_address = Some(String::from("pluto"));
+        b.bind_interface = Some(String::from("tun0"));
+        b.ciphers = Some(vec!["c".to_string(), "d".to_string()]);
+        b.mac = Some(vec!["e".to_string(), "f".to_string()]);
+
+        params.overwrite_if_none(&b);
+        assert_eq!(params.bind_address.unwrap(), "pippo");
+        assert_eq!(params.bind_interface.unwrap(), "tun0");
+
+        // algos
+        assert_eq!(
+            params.ciphers.unwrap(),
+            vec!["a".to_string(), "b".to_string()]
+        );
+        assert_eq!(params.mac.unwrap(), vec!["e".to_string(), "f".to_string()]);
+    }
+
+    #[test]
+    fn test_should_overwrite_if_none_plus_algos() {
+        let mut params = HostParams::default();
+        params.ciphers = Some(vec!["a".to_string(), "b".to_string()]);
+
+        let mut b = HostParams::default();
+        b.ciphers = Some(vec!["+c".to_string(), "d".to_string()]);
+
+        params.overwrite_if_none(&b);
+
+        assert_eq!(
+            params.ciphers.unwrap(),
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_should_overwrite_if_none_minus_algos() {
+        let mut params = HostParams::default();
+        params.ciphers = Some(vec!["a".to_string(), "b".to_string()]);
+
+        let mut b = HostParams::default();
+        b.ciphers = Some(vec!["-a".to_string()]);
+
+        params.overwrite_if_none(&b);
+
+        assert_eq!(params.ciphers.unwrap(), vec!["b".to_string(),]);
     }
 
     #[test]
@@ -376,14 +483,16 @@ mod test {
             "d".to_string(),
         ];
         HostParams::resolve_algorithms(&mut list, &algos);
+
+        // should be `list`, because it's default
         assert_eq!(
             list,
             vec![
-                "1".to_string(),
                 "a".to_string(),
                 "b".to_string(),
-                "3".to_string(),
+                "c".to_string(),
                 "d".to_string(),
+                "e".to_string(),
             ]
         );
     }
