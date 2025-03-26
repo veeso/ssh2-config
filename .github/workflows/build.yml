@@ -17,6 +17,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Set up environment for tests
         run: mkdir -p $HOME/.ssh && touch $HOME/.ssh/config
+      - name: build
+        run: cargo build --verbose
       - name: Style check
         run: cargo fmt --all --check
       - name: Run tests
