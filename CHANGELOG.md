@@ -28,6 +28,7 @@ Released on 26/03/2025
   - This allows to **ACTUALLY** handle algorithms correctly.
   - To pass to ssh options, use `to_string()` method or access to internal vec string.
   - Beware that when accessing the internal vec, you MUST care of what it means for that variant.
+- Replaced `HostParams::merge` with `HostParams::overwrite_if_none` to avoid overwriting existing values.
 
 ## 0.4.0
 

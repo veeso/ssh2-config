@@ -284,7 +284,7 @@ mod test {
         // Query
         assert_eq!(config.query("192.168.1.32"), params1);
         // merged case
-        params1.merge(&params2);
+        params1.overwrite_if_none(&params2);
         assert_eq!(config.query("192.168.10.1"), params1);
         // Negated case
         assert_eq!(config.query("172.26.254.1"), params3);
