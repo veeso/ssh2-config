@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.5.2](#052)
   - [0.5.1](#051)
   - [0.5.0](#050)
   - [0.4.0](#040)
@@ -18,6 +19,12 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.5.2
+
+Released on 27/03/2025
+
+- on docsrs DON'T build algos. It's not allowed by docs.rs
 
 ## 0.5.1
 

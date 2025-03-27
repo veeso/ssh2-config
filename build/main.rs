@@ -7,8 +7,18 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let prefs = openssh::get_my_prefs()?;
-    src_writer::write_source(prefs)?;
+    // if we are on docs.rs, WE DON'T HAVE ACCESS TO NETWORK, USE DEFAULT PREFS
+    #[cfg(docsrs)]
+    {
+        let prefs = openssh::MyPrefs::default();
+        src_writer::write_source(prefs)?;
+    }
+
+    #[cfg(not(docsrs))]
+    {
+        let prefs = openssh::get_my_prefs()?;
+        src_writer::write_source(prefs)?;
+    }
 
     Ok(())
 }

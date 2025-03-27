@@ -5,7 +5,7 @@ use crate::define_parser::parse_defines;
 const OPENSSH_TAG: &str = "V_9_9_P2";
 
 /// Default algorithms for ssh.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct MyPrefs {
     pub ca_signature_algorithms: Vec<String>,
     pub ciphers: Vec<String>,
