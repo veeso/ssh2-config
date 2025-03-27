@@ -8,17 +8,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     // if we are on docs.rs, WE DON'T HAVE ACCESS TO NETWORK, USE DEFAULT PREFS
-    #[cfg(docsrs)]
-    {
-        let prefs = openssh::MyPrefs::default();
-        src_writer::write_source(prefs)?;
-    }
+    let prefs = if std::env::var("DOCS_RS").is_ok() {
+        openssh::MyPrefs::default()
+    } else {
+        openssh::get_my_prefs()?
+    };
 
-    #[cfg(not(docsrs))]
-    {
-        let prefs = openssh::get_my_prefs()?;
-        src_writer::write_source(prefs)?;
-    }
+    src_writer::write_source(prefs)?;
 
     Ok(())
 }
