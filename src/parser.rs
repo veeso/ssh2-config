@@ -99,7 +99,7 @@ impl SshConfigParser {
                 continue;
             }
             // tokenize
-            let (field, args) = match Self::tokenize(&line) {
+            let (field, args) = match Self::tokenize_line(&line) {
                 Ok((field, args)) => (field, args),
                 Err(SshParserError::UnknownField(field, args))
                     if rules.intersects(ParseRule::ALLOW_UNKNOWN_FIELDS)
@@ -399,24 +399,59 @@ impl SshConfigParser {
         Ok(())
     }
 
-    /// Tokenize line if possible. Returns field name and args
-    fn tokenize(line: &str) -> SshParserResult<(Field, Vec<String>)> {
-        let mut tokens = line.split_whitespace();
-        let field = match tokens.next().map(Field::from_str) {
-            Some(Ok(field)) => field,
-            Some(Err(field)) => {
-                return Err(SshParserError::UnknownField(
-                    field,
-                    tokens.map(|x| x.to_string()).collect(),
-                ));
-            }
-            None => return Err(SshParserError::MissingArgument),
+    /// Tokenize line if possible. Returns [`Field`] name and args as a [`Vec`] of [`String`].
+    ///
+    /// All of these lines are valid for tokenization
+    ///
+    /// ```txt
+    /// IgnoreUnknown=Pippo,Pluto
+    /// ConnectTimeout = 15
+    /// Ciphers "Pepperoni Pizza,Margherita Pizza,Hawaiian Pizza"
+    /// Macs="Pasta Carbonara,Pasta con tonno"
+    /// ```
+    ///
+    /// So lines have syntax `field args...`, `field=args...`, `field "args"`, `field="args"`
+    fn tokenize_line(line: &str) -> SshParserResult<(Field, Vec<String>)> {
+        // check what comes first, space or =?
+        let trimmed_line = line.trim();
+        // first token is the field, and it may be separated either by a space or by '='
+        let (field, other_tokens) = if trimmed_line.find('=').unwrap_or(usize::MAX)
+            < trimmed_line.find(char::is_whitespace).unwrap_or(usize::MAX)
+        {
+            trimmed_line
+                .split_once('=')
+                .ok_or(SshParserError::MissingArgument)?
+        } else {
+            trimmed_line
+                .split_once(char::is_whitespace)
+                .ok_or(SshParserError::MissingArgument)?
         };
-        let args = tokens
-            .map(|x| x.trim().to_string())
-            .filter(|x| !x.is_empty())
-            .collect();
-        Ok((field, args))
+
+        trace!("tokenized line '{line}' - field '{field}' with args '{other_tokens}'",);
+
+        // other tokens should trim = and whitespace
+        let other_tokens = other_tokens.trim().trim_start_matches('=').trim();
+        trace!("other tokens trimmed: '{other_tokens}'",);
+
+        // if args is quoted, don't split it
+        let args = if other_tokens.starts_with('"') && other_tokens.ends_with('"') {
+            trace!("quoted args: '{other_tokens}'",);
+            vec![other_tokens[1..other_tokens.len() - 1].to_string()]
+        } else {
+            trace!("splitting args (non-quoted): '{other_tokens}'",);
+            // split by whitespace
+            let tokens = other_tokens.split_whitespace();
+
+            tokens
+                .map(|x| x.trim().to_string())
+                .filter(|x| !x.is_empty())
+                .collect()
+        };
+
+        match Field::from_str(field) {
+            Ok(field) => Ok((field, args)),
+            Err(_) => Err(SshParserError::UnknownField(field.to_string(), args)),
+        }
     }
 
     // -- value parsers
@@ -1179,7 +1214,7 @@ mod test {
     fn should_tokenize_line() -> Result<(), SshParserError> {
         crate::test_log();
         assert_eq!(
-            SshConfigParser::tokenize("HostName 192.168.*.* 172.26.*.*")?,
+            SshConfigParser::tokenize_line("HostName 192.168.*.* 172.26.*.*")?,
             (
                 Field::HostName,
                 vec![String::from("192.168.*.*"), String::from("172.26.*.*")]
@@ -1187,7 +1222,7 @@ mod test {
         );
         // Tokenize line with spaces
         assert_eq!(
-            SshConfigParser::tokenize(
+            SshConfigParser::tokenize_line(
                 "      HostName        192.168.*.*        172.26.*.*        "
             )?,
             (
@@ -1202,7 +1237,7 @@ mod test {
     fn should_not_tokenize_line() {
         crate::test_log();
         assert!(matches!(
-            SshConfigParser::tokenize("Omar     yes").unwrap_err(),
+            SshConfigParser::tokenize_line("Omar     yes").unwrap_err(),
             SshParserError::UnknownField(..)
         ));
     }
@@ -1210,8 +1245,9 @@ mod test {
     #[test]
     fn should_fail_parsing_field() {
         crate::test_log();
+
         assert!(matches!(
-            SshConfigParser::tokenize("                  ").unwrap_err(),
+            SshConfigParser::tokenize_line("                  ").unwrap_err(),
             SshParserError::MissingArgument
         ));
     }
@@ -1476,6 +1512,72 @@ mod test {
             SshConfigParser::strip_comments("# this is a comment").as_str(),
             ""
         );
+    }
+
+    #[test]
+    fn test_should_parse_config_with_quotes_and_eq() {
+        crate::test_log();
+
+        let config = create_ssh_config_with_quotes_and_eq();
+        let file = File::open(config.path()).expect("Failed to open tempfile");
+        let mut reader = BufReader::new(file);
+
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)
+            .expect("Failed to parse config");
+
+        let params = config.query("foo");
+
+        // connect timeout is 15
+        assert_eq!(
+            params.connect_timeout.expect("unspec connect timeout"),
+            Duration::from_secs(15)
+        );
+        assert_eq!(
+            params
+                .ignore_unknown
+                .as_deref()
+                .expect("unspec ignore unknown"),
+            &["Pippo", "Pluto"]
+        );
+        assert_eq!(
+            params
+                .ciphers
+                .algorithms()
+                .iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<&str>>(),
+            &["Pepperoni Pizza", "Margherita Pizza", "Hawaiian Pizza"]
+        );
+        assert_eq!(
+            params
+                .mac
+                .algorithms()
+                .iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<&str>>(),
+            &["Pasta Carbonara", "Pasta con tonno"]
+        );
+    }
+
+    fn create_ssh_config_with_quotes_and_eq() -> NamedTempFile {
+        let mut tmpfile: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let config = r##"
+# ssh config
+# written by veeso
+
+
+# I put a comment here just to annoy
+
+IgnoreUnknown=Pippo,Pluto
+ConnectTimeout = 15
+Ciphers "Pepperoni Pizza,Margherita Pizza,Hawaiian Pizza"
+Macs="Pasta Carbonara,Pasta con tonno"
+"##;
+        tmpfile.write_all(config.as_bytes()).unwrap();
+        tmpfile
     }
 
     fn create_ssh_config() -> NamedTempFile {

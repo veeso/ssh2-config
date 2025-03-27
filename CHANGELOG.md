@@ -20,9 +20,10 @@
 
 ## 0.5.0
 
-Released on 26/03/2025
+Released on 27/03/2025
 
-- Finally fixed how parameters are applied to host patterns
+- [issue 22](https://github.com/veeso/ssh2-config/issues/22): should parse tokens with `=` and quotes (`"`)
+- [issue 21](https://github.com/veeso/ssh2-config/issues/21): Finally fixed how parameters are applied to host patterns
 - Replaced algorithms `Vec<String>` with `Algorithms` type.
   - The new type is a variant with `Append`, `Head`, `Exclude` and `Set`.
   - This allows to **ACTUALLY** handle algorithms correctly.
