@@ -139,32 +139,49 @@ fn configure_session(session: &mut Session, params: &HostParams) {
         println!("keepalive interval: {} seconds", interval);
         session.set_keepalive(true, interval);
     }
-    // algos
-    if let Some(algos) = params.kex_algorithms.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::Kex, algos.join(",").as_str()) {
-            panic!("Could not set KEX algorithms: {}", err);
-        }
+
+    // KEX
+    if let Err(err) = session.method_pref(
+        MethodType::Kex,
+        params.kex_algorithms.algorithms().join(",").as_str(),
+    ) {
+        panic!("Could not set KEX algorithms: {}", err);
     }
-    if let Some(algos) = params.host_key_algorithms.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::HostKey, algos.join(",").as_str()) {
-            panic!("Could not set host key algorithms: {}", err);
-        }
+
+    // host key
+    if let Err(err) = session.method_pref(
+        MethodType::HostKey,
+        params.host_key_algorithms.algorithms().join(",").as_str(),
+    ) {
+        panic!("Could not set host key algorithms: {}", err);
     }
-    if let Some(algos) = params.ciphers.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::CryptCs, algos.join(",").as_str()) {
-            panic!("Could not set crypt algorithms (client-server): {}", err);
-        }
-        if let Err(err) = session.method_pref(MethodType::CryptSc, algos.join(",").as_str()) {
-            panic!("Could not set crypt algorithms (server-client): {}", err);
-        }
+
+    // ciphers
+    if let Err(err) = session.method_pref(
+        MethodType::CryptCs,
+        params.ciphers.algorithms().join(",").as_str(),
+    ) {
+        panic!("Could not set crypt algorithms (client-server): {}", err);
     }
-    if let Some(algos) = params.mac.as_deref() {
-        if let Err(err) = session.method_pref(MethodType::MacCs, algos.join(",").as_str()) {
-            panic!("Could not set MAC algorithms (client-server): {}", err);
-        }
-        if let Err(err) = session.method_pref(MethodType::MacSc, algos.join(",").as_str()) {
-            panic!("Could not set MAC algorithms (server-client): {}", err);
-        }
+    if let Err(err) = session.method_pref(
+        MethodType::CryptSc,
+        params.ciphers.algorithms().join(",").as_str(),
+    ) {
+        panic!("Could not set crypt algorithms (server-client): {}", err);
+    }
+
+    // mac
+    if let Err(err) = session.method_pref(
+        MethodType::MacCs,
+        params.mac.algorithms().join(",").as_str(),
+    ) {
+        panic!("Could not set MAC algorithms (client-server): {}", err);
+    }
+    if let Err(err) = session.method_pref(
+        MethodType::MacSc,
+        params.mac.algorithms().join(",").as_str(),
+    ) {
+        panic!("Could not set MAC algorithms (server-client): {}", err);
     }
 }
 
