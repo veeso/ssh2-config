@@ -1,13 +1,41 @@
 use std::io::Write as _;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::openssh::MyPrefs;
 
+const MAX_TTL: Duration = Duration::from_secs(60 * 60 * 24 * 7); // 1 week
+
+/// Check if the source file should be rebuilt.
+///
+/// File should be rebuilt if it's older than [`MAX_TTL`].
+pub fn should_rebuild() -> bool {
+    let SrcPaths { src_path, .. } = src_path();
+
+    // if file doesn't exist, rebuild
+    if !src_path.exists() {
+        return true;
+    }
+
+    // get metadata
+    let metadata = match std::fs::metadata(&src_path) {
+        Ok(metadata) => metadata,
+        Err(_) => return true,
+    };
+
+    // check if it's older than MAX_TTL
+    let Ok(modified) = metadata.modified() else {
+        return true;
+    };
+
+    match modified.elapsed() {
+        Ok(elapsed) => elapsed > MAX_TTL,
+        Err(_) => true,
+    }
+}
+
 pub fn write_source(prefs: MyPrefs) -> anyhow::Result<()> {
-    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("default_algorithms");
-    let src_path = src_dir.join("openssh.rs");
+    let SrcPaths { src_dir, src_path } = src_path();
 
     // create dir
     if !src_dir.exists() {
@@ -57,4 +85,18 @@ fn write_vec(file: &mut std::fs::File, name: &str, vec: &[String]) -> anyhow::Re
     }
     writeln!(file, r#"        ],"#)?;
     Ok(())
+}
+
+struct SrcPaths {
+    src_dir: PathBuf,
+    src_path: PathBuf,
+}
+
+fn src_path() -> SrcPaths {
+    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("default_algorithms");
+    let src_path = src_dir.join("openssh.rs");
+
+    SrcPaths { src_dir, src_path }
 }
