@@ -399,7 +399,18 @@ impl SshConfigParser {
         Ok(())
     }
 
-    /// Tokenize line if possible. Returns [`Field`] name and args as a [`Vec`] of [`String`]
+    /// Tokenize line if possible. Returns [`Field`] name and args as a [`Vec`] of [`String`].
+    ///
+    /// All of these lines are valid for tokenization
+    ///
+    /// ```txt
+    /// IgnoreUnknown=Pippo,Pluto
+    /// ConnectTimeout = 15
+    /// Ciphers "Pepperoni Pizza,Margherita Pizza,Hawaiian Pizza"
+    /// Macs="Pasta Carbonara,Pasta con tonno"
+    /// ```
+    ///
+    /// So lines have syntax `field args...`, `field=args...`, `field "args"`, `field="args"`
     fn tokenize_line(line: &str) -> SshParserResult<(Field, Vec<String>)> {
         // check what comes first, space or =?
         let trimmed_line = line.trim();
