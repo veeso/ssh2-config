@@ -1,5 +1,5 @@
 [package]
-authors = ["Christian Visintin <christian.visintin1997@gmail.com>"]
+authors = ["Christian Visintin <christian.visintin@veeso.dev>"]
 categories = ["network-programming"]
 description = "an ssh configuration parser for ssh2-rs"
 documentation = "https://docs.rs/ssh2-config"
