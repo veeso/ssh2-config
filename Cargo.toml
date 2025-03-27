@@ -5,13 +5,20 @@ description = "an ssh configuration parser for ssh2-rs"
 documentation = "https://docs.rs/ssh2-config"
 edition = "2024"
 homepage = "https://veeso.github.io/ssh2-config/"
-include = ["src/**/*", "examples/**/*", "LICENSE", "README.md", "CHANGELOG.md"]
+include = [
+  "build/**/*",
+  "examples/**/*",
+  "src/**/*",
+  "LICENSE",
+  "README.md",
+  "CHANGELOG.md",
+]
 keywords = ["ssh2", "ssh", "ssh-config", "ssh-config-parser"]
 license = "MIT"
 name = "ssh2-config"
 readme = "README.md"
 repository = "https://github.com/veeso/ssh2-config"
-version = "0.5.0"
+version = "0.5.1"
 build = "build/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
