@@ -1,7 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
-  - [0.5.3](#053)
+  - [0.5.4](#054)
   - [0.5.1](#051)
   - [0.5.0](#050)
   - [0.4.0](#040)
@@ -20,11 +20,12 @@
 
 ---
 
-## 0.5.3
+## 0.5.4
 
 Released on 27/03/2025
 
 - on docsrs DON'T build algos. It's not allowed by docs.rs
+- added `RELOAD_SSH_ALGO` env variable to rebuild algos.
 
 ## 0.5.1
 

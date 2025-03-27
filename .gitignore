@@ -23,5 +23,3 @@ dist/pkgs/arch/*.tar.gz
 
 # Macos
 .DS_Store
-
-src/default_algorithms/openssh.rs

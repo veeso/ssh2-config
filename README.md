@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">Developed by <a href="https://veeso.github.io/" target="_blank">@veeso</a></p>
-<p align="center">Current version: 0.5.3 (27/03/2025)</p>
+<p align="center">Current version: 0.5.4 (27/03/2025)</p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"
@@ -282,6 +282,8 @@ If we get rules for `192.168.1.1`, ciphers will be `a,b,c`, because default is s
 ---
 
 ## Configuring default algorithms
+
+To reload algos, build ssh2-config with `RELOAD_SSH_ALGO` env variable set.
 
 When you invoke `SshConfig::default`, the default algorithms are set from openssh source code, which are the following:
 

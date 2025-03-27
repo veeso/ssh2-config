@@ -3,17 +3,12 @@ mod openssh;
 mod src_writer;
 
 fn main() -> anyhow::Result<()> {
-    if !src_writer::should_rebuild() {
+    // If reload SSH ALGO is not set, we don't need to do anything
+    if std::env::var("RELOAD_SSH_ALGO").is_err() {
         return Ok(());
     }
 
-    // if we are on docs.rs, WE DON'T HAVE ACCESS TO NETWORK, USE DEFAULT PREFS
-    let prefs = if std::env::var("DOCS_RS").is_ok() {
-        openssh::MyPrefs::default()
-    } else {
-        openssh::get_my_prefs()?
-    };
-
+    let prefs = openssh::get_my_prefs()?;
     src_writer::write_source(prefs)?;
 
     Ok(())
