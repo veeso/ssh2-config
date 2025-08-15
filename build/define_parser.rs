@@ -31,11 +31,11 @@ pub fn parse_defines(reader: impl BufRead) -> anyhow::Result<HashMap<String, Str
             let mut single_line = true;
 
             // if last token is a \; remove it
-            if let Some(last) = tokens.last() {
-                if *last == "\\" {
-                    tokens.pop();
-                    single_line = false;
-                }
+            if let Some(last) = tokens.last()
+                && *last == "\\"
+            {
+                tokens.pop();
+                single_line = false;
             }
 
             // get tokens after the name
@@ -51,10 +51,8 @@ pub fn parse_defines(reader: impl BufRead) -> anyhow::Result<HashMap<String, Str
             });
 
             // if is single line, push to defines and set scope to None
-            if single_line {
-                if let Some(scope) = scope.take() {
-                    defines.insert(scope.name, scope.tokens.join(" "));
-                }
+            if single_line && let Some(scope) = scope.take() {
+                defines.insert(scope.name, scope.tokens.join(" "));
             }
         } else {
             // if we are in a scope, add the line to the tokens
@@ -67,11 +65,11 @@ pub fn parse_defines(reader: impl BufRead) -> anyhow::Result<HashMap<String, Str
 
             // check if it ends with a \, if so, remove it
             let mut last_line = true;
-            if let Some(last) = tokens.last() {
-                if last == "\\" {
-                    tokens.pop();
-                    last_line = false;
-                }
+            if let Some(last) = tokens.last()
+                && last == "\\"
+            {
+                tokens.pop();
+                last_line = false;
             }
 
             // parse tokens
@@ -81,10 +79,8 @@ pub fn parse_defines(reader: impl BufRead) -> anyhow::Result<HashMap<String, Str
             }
 
             // if last line, push to defines and set scope to None
-            if last_line {
-                if let Some(scope) = scope.take() {
-                    defines.insert(scope.name, scope.tokens.join(" "));
-                }
+            if last_line && let Some(scope) = scope.take() {
+                defines.insert(scope.name, scope.tokens.join(" "));
             }
         }
     }
