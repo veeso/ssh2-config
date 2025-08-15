@@ -26,6 +26,7 @@
 Released on 15/08/2025
 
 - If `Include` directive contains a relative path, it must be resolved to `$HOME/.ssh/${PATH}`
+- Updated ssh default algos to `V_10_0_P2`
 
 ## 0.5.4
 
