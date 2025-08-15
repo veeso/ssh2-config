@@ -366,6 +366,29 @@ impl SshConfigParser {
         Ok(())
     }
 
+    /// Resolve the include path for a given path match.
+    ///
+    /// If the path match is absolute, it just returns the path as-is;
+    /// if it is relative, it prepends $HOME/.ssh to it
+    fn resolve_include_path(path_match: &str) -> String {
+        #[cfg(windows)]
+        const PATH_SEPARATOR: &str = "\\";
+        #[cfg(unix)]
+        const PATH_SEPARATOR: &str = "/";
+
+        // if path match doesn't start with the path separator, prepend it
+        if path_match.starts_with(PATH_SEPARATOR) {
+            path_match.to_string()
+        } else {
+            // prepend $HOME/.ssh
+            let home_dir = dirs::home_dir().unwrap_or(PathBuf::from(PATH_SEPARATOR));
+            format!(
+                "{dir}{PATH_SEPARATOR}{path_match}",
+                dir = home_dir.join(".ssh").display()
+            )
+        }
+    }
+
     /// include a file by parsing it and updating host rules by merging the read config to the current one for the host
     fn include_files(
         args: Vec<String>,
@@ -373,7 +396,8 @@ impl SshConfigParser {
         rules: ParseRule,
         default_algos: &DefaultAlgorithms,
     ) -> SshParserResult<()> {
-        let path_match = Self::parse_string(args)?;
+        let path_match = Self::resolve_include_path(&Self::parse_string(args)?);
+
         trace!("include files: {path_match}",);
         let files = glob(&path_match)?;
 
@@ -1559,6 +1583,31 @@ mod test {
                 .collect::<Vec<&str>>(),
             &["Pasta Carbonara", "Pasta con tonno"]
         );
+    }
+
+    #[test]
+    fn test_should_resolve_absolute_include_path() {
+        crate::test_log();
+
+        let expected = PathBuf::from("/tmp/config.local");
+
+        let s = "/tmp/config.local";
+        let resolved = PathBuf::from(SshConfigParser::resolve_include_path(s));
+        assert_eq!(resolved, expected);
+    }
+
+    #[test]
+    fn test_should_resolve_relative_include_path() {
+        crate::test_log();
+
+        let expected = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("~"))
+            .join(".ssh")
+            .join("config.local");
+
+        let s = "config.local";
+        let resolved = PathBuf::from(SshConfigParser::resolve_include_path(s));
+        assert_eq!(resolved, expected);
     }
 
     fn create_ssh_config_with_quotes_and_eq() -> NamedTempFile {

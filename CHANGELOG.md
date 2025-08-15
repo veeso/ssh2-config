@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.5.5](#055)
   - [0.5.4](#054)
   - [0.5.1](#051)
   - [0.5.0](#050)
@@ -19,6 +20,12 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.5.5
+
+Released on 15/08/2025
+
+- If `Include` directive contains a relative path, it must be resolved to `$HOME/.ssh/${PATH}`
 
 ## 0.5.4
 
