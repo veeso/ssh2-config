@@ -182,7 +182,7 @@ impl HostParams {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use std::str::FromStr;
 

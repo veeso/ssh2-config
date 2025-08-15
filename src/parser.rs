@@ -596,7 +596,7 @@ impl SshConfigParser {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use std::fs::File;
     use std::io::{BufReader, Write};

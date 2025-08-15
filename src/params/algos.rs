@@ -216,7 +216,7 @@ impl fmt::Display for Algorithms {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use pretty_assertions::assert_eq;
 

@@ -272,6 +272,22 @@ impl fmt::Display for SshConfig {
 }
 
 impl SshConfig {
+    /// Constructs a new [`SshConfig`] from a list of [`Host`]s.
+    ///
+    /// You can later also set the [`DefaultAlgorithms`] using [`SshConfig::default_algorithms`].
+    ///
+    /// ```rust
+    /// use ssh2_config::{DefaultAlgorithms, Host, SshConfig};
+    ///
+    /// let config = SshConfig::from_hosts(vec![/* put your hosts here */]).default_algorithms(DefaultAlgorithms::default());
+    /// ```
+    pub fn from_hosts(hosts: Vec<Host>) -> Self {
+        Self {
+            default_algorithms: DefaultAlgorithms::default(),
+            hosts,
+        }
+    }
+
     /// Query params for a certain host. Returns [`HostParams`] for the host.
     pub fn query<S: AsRef<str>>(&self, pattern: S) -> HostParams {
         let mut params = HostParams::new(&self.default_algorithms);
@@ -358,7 +374,7 @@ fn test_log() {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use pretty_assertions::assert_eq;
 

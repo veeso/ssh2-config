@@ -1,7 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
-  - [0.5.5](#055)
+  - [0.6.0](#060)
   - [0.5.4](#054)
   - [0.5.1](#051)
   - [0.5.0](#050)
@@ -21,10 +21,11 @@
 
 ---
 
-## 0.5.5
+## 0.6.0
 
 Released on 15/08/2025
 
+- Added a new constructor `SshConfig::from_hosts()` to build a `SshConfig` from a list of `Host`.
 - If `Include` directive contains a relative path, it must be resolved to `$HOME/.ssh/${PATH}`
 - Updated ssh default algos to `V_10_0_P2`
 
