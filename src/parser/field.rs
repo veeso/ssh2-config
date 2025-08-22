@@ -29,6 +29,7 @@ pub enum Field {
     KexAlgorithms,
     Mac,
     Port,
+    ProxyJump,
     PubkeyAcceptedAlgorithms,
     PubkeyAuthentication,
     RemoteForward,
@@ -87,7 +88,6 @@ pub enum Field {
     PKCS11Provider,
     PreferredAuthentications,
     ProxyCommand,
-    ProxyJump,
     ProxyUseFdpass,
     PubkeyAcceptedKeyTypes,
     RekeyLimit,
@@ -132,6 +132,7 @@ impl FromStr for Field {
             "kexalgorithms" => Ok(Self::KexAlgorithms),
             "macs" => Ok(Self::Mac),
             "port" => Ok(Self::Port),
+            "proxyjump" => Ok(Self::ProxyJump),
             "pubkeyacceptedalgorithms" => Ok(Self::PubkeyAcceptedAlgorithms),
             "pubkeyauthentication" => Ok(Self::PubkeyAuthentication),
             "remoteforward" => Ok(Self::RemoteForward),
@@ -190,7 +191,6 @@ impl FromStr for Field {
             "pkcs11provider" => Ok(Self::PKCS11Provider),
             "preferredauthentications" => Ok(Self::PreferredAuthentications),
             "proxycommand" => Ok(Self::ProxyCommand),
-            "proxyjump" => Ok(Self::ProxyJump),
             "proxyusefdpass" => Ok(Self::ProxyUseFdpass),
             "pubkeyacceptedkeytypes" => Ok(Self::PubkeyAcceptedKeyTypes),
             "rekeylimit" => Ok(Self::RekeyLimit),
@@ -237,6 +237,7 @@ impl fmt::Display for Field {
             Self::KexAlgorithms => "kexalgorithms",
             Self::Mac => "macs",
             Self::Port => "port",
+            Self::ProxyJump => "proxyjump",
             Self::PubkeyAcceptedAlgorithms => "pubkeyacceptedalgorithms",
             Self::PubkeyAuthentication => "pubkeyauthentication",
             Self::RemoteForward => "remoteforward",
@@ -295,7 +296,6 @@ impl fmt::Display for Field {
             Self::PKCS11Provider => "pkcs11provider",
             Self::PreferredAuthentications => "preferredauthentications",
             Self::ProxyCommand => "proxycommand",
-            Self::ProxyJump => "proxyjump",
             Self::ProxyUseFdpass => "proxyusefdpass",
             Self::PubkeyAcceptedKeyTypes => "pubkeyacceptedkeytypes",
             Self::RekeyLimit => "rekeylimit",
@@ -377,6 +377,7 @@ mod tests {
             Field::IgnoreUnknown
         );
         assert_eq!(Field::from_str("Macs").ok().unwrap(), Field::Mac);
+        assert_eq!(Field::from_str("ProxyJump").ok().unwrap(), Field::ProxyJump);
         assert_eq!(
             Field::from_str("PubkeyAcceptedAlgorithms").ok().unwrap(),
             Field::PubkeyAcceptedAlgorithms

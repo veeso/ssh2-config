@@ -263,6 +263,11 @@ impl SshConfigParser {
                 trace!("port: {value}",);
                 params.port = Some(value);
             }
+            Field::ProxyJump => {
+                let rule = Self::parse_comma_separated_list(args)?;
+                trace!("proxy_jump: {rule:?}",);
+                params.proxy_jump = Some(rule);
+            }
             Field::PubkeyAcceptedAlgorithms => {
                 let rule = Self::parse_algos(args)?;
                 trace!("pubkey_accepted_algorithms: {rule:?}",);
@@ -348,7 +353,6 @@ impl SshConfigParser {
             | Field::PKCS11Provider
             | Field::PreferredAuthentications
             | Field::ProxyCommand
-            | Field::ProxyJump
             | Field::ProxyUseFdpass
             | Field::PubkeyAcceptedKeyTypes
             | Field::RekeyLimit
@@ -690,6 +694,10 @@ mod tests {
         );
         assert_eq!(params_172_26_104_4.mac.algorithms(), &["spyro", "deoxys"]); // use subconfig; defined before * macs
         assert_eq!(
+            params_172_26_104_4.proxy_jump.unwrap(),
+            &["jump.example.com"]
+        ); // use subconfig; defined before * macs
+        assert_eq!(
             params_172_26_104_4
                 .pubkey_accepted_algorithms
                 .algorithms()
@@ -738,6 +746,13 @@ mod tests {
         assert_eq!(
             params_tostapane.mac.algorithms(),
             vec!["spyro".to_string(), "deoxys".to_string(),]
+        );
+        assert_eq!(
+            params_tostapane.proxy_jump.unwrap(),
+            vec![
+                "jump1.example.com".to_string(),
+                "jump2.example.com".to_string(),
+            ]
         );
         assert_eq!(
             params_tostapane.pubkey_accepted_algorithms.algorithms(),
@@ -1671,6 +1686,7 @@ Host 192.168.*.*    172.26.*.*      !192.168.1.30
     Macs     spyro,deoxys
     Port 2222
     PubkeyAcceptedAlgorithms    -omar-crypt
+    ProxyJump jump.example.com
 
 Host tostapane
     User    ciro-esposito
@@ -1679,6 +1695,7 @@ Host tostapane
     Compression no
     Pippo yes
     Pluto 56
+    ProxyJump jump1.example.com,jump2.example.com
     Macs +spyro,deoxys
 
 Host    192.168.1.30

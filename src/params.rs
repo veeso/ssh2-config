@@ -52,6 +52,8 @@ pub struct HostParams {
     pub mac: Algorithms,
     /// Specifies the port number to connect on the remote host.
     pub port: Option<u16>,
+    /// Specifies one or more jump proxies as either [user@]host[:port] or an ssh URI
+    pub proxy_jump: Option<Vec<String>>,
     /// Specifies the signature algorithms that will be used for public key authentication
     pub pubkey_accepted_algorithms: Algorithms,
     /// Specifies whether to try public key authentication using SSH keys
@@ -94,6 +96,7 @@ impl HostParams {
             kex_algorithms: Algorithms::new(&default_algorithms.kex_algorithms),
             mac: Algorithms::new(&default_algorithms.mac),
             port: None,
+            proxy_jump: None,
             pubkey_accepted_algorithms: Algorithms::new(
                 &default_algorithms.pubkey_accepted_algorithms,
             ),
@@ -143,6 +146,7 @@ impl HostParams {
             .clone()
             .or_else(|| b.ignore_unknown.clone());
         self.port = self.port.or(b.port);
+        self.proxy_jump = self.proxy_jump.clone().or_else(|| b.proxy_jump.clone());
         self.pubkey_authentication = self.pubkey_authentication.or(b.pubkey_authentication);
         self.remote_forward = self.remote_forward.or(b.remote_forward);
         self.server_alive_interval = self.server_alive_interval.or(b.server_alive_interval);
@@ -231,6 +235,7 @@ mod tests {
         );
         assert_eq!(params.mac.algorithms(), DefaultAlgorithms::default().mac);
         assert!(params.port.is_none());
+        assert!(params.proxy_jump.is_none());
         assert_eq!(
             params.pubkey_accepted_algorithms.algorithms(),
             DefaultAlgorithms::default().pubkey_accepted_algorithms

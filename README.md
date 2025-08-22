@@ -104,6 +104,7 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 - **KexAlgorithms**: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.to_string().as_str())`
 - **MACs**: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos..to_string().as_str())` and `session.method_pref(MethodType::MacSc, algos..to_string().as_str())`
 - **Port**: you can use this attribute to resolve the port to connect to
+- **ProxyJump**: you can use this attribute to specify hosts to jump via
 - **PubkeyAuthentication**: you can use this attribute to set whether to use the pubkey authentication
 - **RemoteForward**: you can use this method to implement port forwarding with `session.channel_forward_listen()`
 - **ServerAliveInterval**: you can use this method to implement keep alive message interval
