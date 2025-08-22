@@ -78,7 +78,7 @@ impl SshConfigParser {
         // are parsed as command line options;
         // overriding all following host-specific options.
         //
-        // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1051-L1054
+        // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1173-L1176
         config.hosts.push(Host::new(
             vec![HostClause::new(String::from("*"), false)],
             HostParams::new(&config.default_algorithms),
