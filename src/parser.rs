@@ -174,6 +174,11 @@ impl SshConfigParser {
         trace!("parsing field {field:?} with args {args:?}",);
         let params = &mut host.params;
         match field {
+            Field::AddKeysToAgent => {
+                let value = Self::parse_boolean(args)?;
+                trace!("add_keys_to_agent: {value}",);
+                params.add_keys_to_agent = Some(value);
+            }
             Field::BindAddress => {
                 let value = Self::parse_string(args)?;
                 trace!("bind_address: {value}",);
@@ -290,8 +295,7 @@ impl SshConfigParser {
                 params.user = Some(value);
             }
             // -- unimplemented fields
-            Field::AddKeysToAgent
-            | Field::AddressFamily
+            Field::AddressFamily
             | Field::BatchMode
             | Field::CanonicalDomains
             | Field::CanonicalizeFallbackLock
@@ -662,6 +666,7 @@ mod tests {
         let params_172_26_104_4 = config.query("172.26.104.4");
 
         // cmdline overrides
+        assert_eq!(params_172_26_104_4.add_keys_to_agent.unwrap(), true);
         assert_eq!(params_172_26_104_4.compression.unwrap(), true);
         assert_eq!(params_172_26_104_4.connection_attempts.unwrap(), 10);
         assert_eq!(
@@ -1194,7 +1199,7 @@ mod tests {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         let result = SshConfigParser::update_host(
-            Field::AddKeysToAgent,
+            Field::PasswordAuthentication,
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
@@ -1215,7 +1220,7 @@ mod tests {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         let result = SshConfigParser::update_host(
-            Field::AddKeysToAgent,
+            Field::PasswordAuthentication,
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
@@ -1224,7 +1229,7 @@ mod tests {
 
         match result {
             Err(SshParserError::UnsupportedField(field, _)) => {
-                assert_eq!(field, "addkeystoagent");
+                assert_eq!(field, "passwordauthentication");
                 Ok(())
             }
             e => e,
@@ -1656,6 +1661,7 @@ Host 192.168.*.*    172.26.*.*      !192.168.1.30
     ForwardAgent    yes
     BindAddress     10.8.0.10
     BindInterface   tun0
+    AddKeysToAgent yes
     Ciphers     +coi-piedi,cazdecan,triestin-stretto
     IdentityFile    /home/root/.ssh/pippo.key /home/root/.ssh/pluto.key
     Macs     spyro,deoxys

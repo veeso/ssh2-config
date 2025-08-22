@@ -16,6 +16,8 @@ use crate::DefaultAlgorithms;
 /// Only arguments supported by libssh2 are implemented
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostParams {
+    /// Specifies whether keys should be automatically added to a running ssh-agent(1)
+    pub add_keys_to_agent: Option<bool>,
     /// Specifies to use the specified address on the local machine as the source address of the connection
     pub bind_address: Option<String>,
     /// Use the specified address on the local machine as the source address of the connection
@@ -73,6 +75,7 @@ impl HostParams {
     /// Create a new [`HostParams`] object with the [`DefaultAlgorithms`]
     pub fn new(default_algorithms: &DefaultAlgorithms) -> Self {
         Self {
+            add_keys_to_agent: None,
             bind_address: None,
             bind_interface: None,
             ca_signature_algorithms: Algorithms::new(&default_algorithms.ca_signature_algorithms),
@@ -113,6 +116,7 @@ impl HostParams {
 
     /// Given a [`HostParams`] object `b`, it will overwrite all the params from `self` only if they are [`None`]
     pub fn overwrite_if_none(&mut self, b: &Self) {
+        self.add_keys_to_agent = self.add_keys_to_agent.or(b.add_keys_to_agent);
         self.bind_address = self.bind_address.clone().or_else(|| b.bind_address.clone());
         self.bind_interface = self
             .bind_interface
@@ -194,6 +198,7 @@ mod tests {
     #[test]
     fn should_initialize_params() {
         let params = HostParams::new(&DefaultAlgorithms::default());
+        assert!(params.add_keys_to_agent.is_none());
         assert!(params.bind_address.is_none());
         assert!(params.bind_interface.is_none());
         assert_eq!(

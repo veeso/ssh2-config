@@ -89,6 +89,7 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 
 ### Exposed attributes
 
+- **AddKeysToAgent**: you can use this attribute add keys to the SSH agent
 - **BindAddress**: you can use this attribute to bind the socket to a certain address
 - **BindInterface**: you can use this attribute to bind the socket to a certain network interface
 - **CASignatureAlgorithms**: you can use this attribute to handle CA certificates

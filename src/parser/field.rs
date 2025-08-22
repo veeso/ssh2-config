@@ -12,6 +12,7 @@ use std::str::FromStr;
 #[derive(Debug, Eq, PartialEq)]
 pub enum Field {
     Host,
+    AddKeysToAgent,
     BindAddress,
     BindInterface,
     CaSignatureAlgorithms,
@@ -36,7 +37,6 @@ pub enum Field {
     UseKeychain,
     User,
     // -- not implemented
-    AddKeysToAgent,
     AddressFamily,
     BatchMode,
     CanonicalDomains,
@@ -115,6 +115,7 @@ impl FromStr for Field {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "host" => Ok(Self::Host),
+            "addkeystoagent" => Ok(Self::AddKeysToAgent),
             "bindaddress" => Ok(Self::BindAddress),
             "bindinterface" => Ok(Self::BindInterface),
             "casignaturealgorithms" => Ok(Self::CaSignatureAlgorithms),
@@ -139,7 +140,6 @@ impl FromStr for Field {
             "usekeychain" => Ok(Self::UseKeychain),
             "user" => Ok(Self::User),
             // -- not implemented fields
-            "addkeystoagent" => Ok(Self::AddKeysToAgent),
             "addressfamily" => Ok(Self::AddressFamily),
             "batchmode" => Ok(Self::BatchMode),
             "canonicaldomains" => Ok(Self::CanonicalDomains),
@@ -220,6 +220,7 @@ impl fmt::Display for Field {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::Host => "host",
+            Self::AddKeysToAgent => "addkeystoagent",
             Self::BindAddress => "bindaddress",
             Self::BindInterface => "bindinterface",
             Self::CaSignatureAlgorithms => "casignaturealgorithms",
@@ -244,7 +245,6 @@ impl fmt::Display for Field {
             Self::UseKeychain => "usekeychain",
             Self::User => "user",
             // Continuation of the rest of the enum variants
-            Self::AddKeysToAgent => "addkeystoagent",
             Self::AddressFamily => "addressfamily",
             Self::BatchMode => "batchmode",
             Self::CanonicalDomains => "canonicaldomains",
@@ -330,6 +330,10 @@ mod tests {
     #[test]
     fn should_parse_field_from_string() {
         assert_eq!(Field::from_str("Host").ok().unwrap(), Field::Host);
+        assert_eq!(
+            Field::from_str("AddKeysToAgent").ok().unwrap(),
+            Field::AddKeysToAgent
+        );
         assert_eq!(
             Field::from_str("BindAddress").ok().unwrap(),
             Field::BindAddress
