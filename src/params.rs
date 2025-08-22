@@ -16,6 +16,8 @@ use crate::DefaultAlgorithms;
 /// Only arguments supported by libssh2 are implemented
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostParams {
+    /// Specifies whether keys should be automatically added to a running ssh-agent(1)
+    pub add_keys_to_agent: Option<bool>,
     /// Specifies to use the specified address on the local machine as the source address of the connection
     pub bind_address: Option<String>,
     /// Use the specified address on the local machine as the source address of the connection
@@ -32,6 +34,8 @@ pub struct HostParams {
     pub connection_attempts: Option<usize>,
     /// Specifies the timeout used when connecting to the SSH server
     pub connect_timeout: Option<Duration>,
+    /// Specifies whether the connection to the authentication agent (if any) will be forwarded to the remote machine
+    pub forward_agent: Option<bool>,
     /// Specifies the host key signature algorithms that the client wants to use in order of preference
     pub host_key_algorithms: Algorithms,
     /// Specifies the real host name to log into
@@ -48,6 +52,8 @@ pub struct HostParams {
     pub mac: Algorithms,
     /// Specifies the port number to connect on the remote host.
     pub port: Option<u16>,
+    /// Specifies one or more jump proxies as either [user@]host[:port] or an ssh URI
+    pub proxy_jump: Option<Vec<String>>,
     /// Specifies the signature algorithms that will be used for public key authentication
     pub pubkey_accepted_algorithms: Algorithms,
     /// Specifies whether to try public key authentication using SSH keys
@@ -73,6 +79,7 @@ impl HostParams {
     /// Create a new [`HostParams`] object with the [`DefaultAlgorithms`]
     pub fn new(default_algorithms: &DefaultAlgorithms) -> Self {
         Self {
+            add_keys_to_agent: None,
             bind_address: None,
             bind_interface: None,
             ca_signature_algorithms: Algorithms::new(&default_algorithms.ca_signature_algorithms),
@@ -81,6 +88,7 @@ impl HostParams {
             compression: None,
             connection_attempts: None,
             connect_timeout: None,
+            forward_agent: None,
             host_key_algorithms: Algorithms::new(&default_algorithms.host_key_algorithms),
             host_name: None,
             identity_file: None,
@@ -88,6 +96,7 @@ impl HostParams {
             kex_algorithms: Algorithms::new(&default_algorithms.kex_algorithms),
             mac: Algorithms::new(&default_algorithms.mac),
             port: None,
+            proxy_jump: None,
             pubkey_accepted_algorithms: Algorithms::new(
                 &default_algorithms.pubkey_accepted_algorithms,
             ),
@@ -113,6 +122,7 @@ impl HostParams {
 
     /// Given a [`HostParams`] object `b`, it will overwrite all the params from `self` only if they are [`None`]
     pub fn overwrite_if_none(&mut self, b: &Self) {
+        self.add_keys_to_agent = self.add_keys_to_agent.or(b.add_keys_to_agent);
         self.bind_address = self.bind_address.clone().or_else(|| b.bind_address.clone());
         self.bind_interface = self
             .bind_interface
@@ -125,6 +135,7 @@ impl HostParams {
         self.compression = self.compression.or(b.compression);
         self.connection_attempts = self.connection_attempts.or(b.connection_attempts);
         self.connect_timeout = self.connect_timeout.or(b.connect_timeout);
+        self.forward_agent = self.forward_agent.or(b.forward_agent);
         self.host_name = self.host_name.clone().or_else(|| b.host_name.clone());
         self.identity_file = self
             .identity_file
@@ -135,6 +146,7 @@ impl HostParams {
             .clone()
             .or_else(|| b.ignore_unknown.clone());
         self.port = self.port.or(b.port);
+        self.proxy_jump = self.proxy_jump.clone().or_else(|| b.proxy_jump.clone());
         self.pubkey_authentication = self.pubkey_authentication.or(b.pubkey_authentication);
         self.remote_forward = self.remote_forward.or(b.remote_forward);
         self.server_alive_interval = self.server_alive_interval.or(b.server_alive_interval);
@@ -194,6 +206,7 @@ mod tests {
     #[test]
     fn should_initialize_params() {
         let params = HostParams::new(&DefaultAlgorithms::default());
+        assert!(params.add_keys_to_agent.is_none());
         assert!(params.bind_address.is_none());
         assert!(params.bind_interface.is_none());
         assert_eq!(
@@ -208,6 +221,7 @@ mod tests {
         assert!(params.compression.is_none());
         assert!(params.connection_attempts.is_none());
         assert!(params.connect_timeout.is_none());
+        assert!(params.forward_agent.is_none());
         assert_eq!(
             params.host_key_algorithms.algorithms(),
             DefaultAlgorithms::default().host_key_algorithms
@@ -221,6 +235,7 @@ mod tests {
         );
         assert_eq!(params.mac.algorithms(), DefaultAlgorithms::default().mac);
         assert!(params.port.is_none());
+        assert!(params.proxy_jump.is_none());
         assert_eq!(
             params.pubkey_accepted_algorithms.algorithms(),
             DefaultAlgorithms::default().pubkey_accepted_algorithms

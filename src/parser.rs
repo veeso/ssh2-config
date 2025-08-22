@@ -174,6 +174,11 @@ impl SshConfigParser {
         trace!("parsing field {field:?} with args {args:?}",);
         let params = &mut host.params;
         match field {
+            Field::AddKeysToAgent => {
+                let value = Self::parse_boolean(args)?;
+                trace!("add_keys_to_agent: {value}",);
+                params.add_keys_to_agent = Some(value);
+            }
             Field::BindAddress => {
                 let value = Self::parse_string(args)?;
                 trace!("bind_address: {value}",);
@@ -214,6 +219,11 @@ impl SshConfigParser {
                 trace!("connection_attempts: {value}",);
                 params.connection_attempts = Some(value);
             }
+            Field::ForwardAgent => {
+                let value = Self::parse_boolean(args)?;
+                trace!("forward_agent: {value}",);
+                params.forward_agent = Some(value);
+            }
             Field::Host => { /* already handled before */ }
             Field::HostKeyAlgorithms => {
                 let rule = Self::parse_algos(args)?;
@@ -253,6 +263,11 @@ impl SshConfigParser {
                 trace!("port: {value}",);
                 params.port = Some(value);
             }
+            Field::ProxyJump => {
+                let rule = Self::parse_comma_separated_list(args)?;
+                trace!("proxy_jump: {rule:?}",);
+                params.proxy_jump = Some(rule);
+            }
             Field::PubkeyAcceptedAlgorithms => {
                 let rule = Self::parse_algos(args)?;
                 trace!("pubkey_accepted_algorithms: {rule:?}",);
@@ -290,8 +305,7 @@ impl SshConfigParser {
                 params.user = Some(value);
             }
             // -- unimplemented fields
-            Field::AddKeysToAgent
-            | Field::AddressFamily
+            Field::AddressFamily
             | Field::BatchMode
             | Field::CanonicalDomains
             | Field::CanonicalizeFallbackLock
@@ -309,7 +323,6 @@ impl SshConfigParser {
             | Field::ExitOnForwardFailure
             | Field::FingerprintHash
             | Field::ForkAfterAuthentication
-            | Field::ForwardAgent
             | Field::ForwardX11
             | Field::ForwardX11Timeout
             | Field::ForwardX11Trusted
@@ -340,7 +353,6 @@ impl SshConfigParser {
             | Field::PKCS11Provider
             | Field::PreferredAuthentications
             | Field::ProxyCommand
-            | Field::ProxyJump
             | Field::ProxyUseFdpass
             | Field::PubkeyAcceptedKeyTypes
             | Field::RekeyLimit
@@ -662,6 +674,7 @@ mod tests {
         let params_172_26_104_4 = config.query("172.26.104.4");
 
         // cmdline overrides
+        assert_eq!(params_172_26_104_4.add_keys_to_agent.unwrap(), true);
         assert_eq!(params_172_26_104_4.compression.unwrap(), true);
         assert_eq!(params_172_26_104_4.connection_attempts.unwrap(), 10);
         assert_eq!(
@@ -680,6 +693,10 @@ mod tests {
             &["a-manella", "blowfish",]
         );
         assert_eq!(params_172_26_104_4.mac.algorithms(), &["spyro", "deoxys"]); // use subconfig; defined before * macs
+        assert_eq!(
+            params_172_26_104_4.proxy_jump.unwrap(),
+            &["jump.example.com"]
+        ); // use subconfig; defined before * macs
         assert_eq!(
             params_172_26_104_4
                 .pubkey_accepted_algorithms
@@ -729,6 +746,13 @@ mod tests {
         assert_eq!(
             params_tostapane.mac.algorithms(),
             vec!["spyro".to_string(), "deoxys".to_string(),]
+        );
+        assert_eq!(
+            params_tostapane.proxy_jump.unwrap(),
+            vec![
+                "jump1.example.com".to_string(),
+                "jump2.example.com".to_string(),
+            ]
         );
         assert_eq!(
             params_tostapane.pubkey_accepted_algorithms.algorithms(),
@@ -1194,7 +1218,7 @@ mod tests {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         let result = SshConfigParser::update_host(
-            Field::AddKeysToAgent,
+            Field::PasswordAuthentication,
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
@@ -1215,7 +1239,7 @@ mod tests {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         let result = SshConfigParser::update_host(
-            Field::AddKeysToAgent,
+            Field::PasswordAuthentication,
             vec![String::from("yes")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
@@ -1224,7 +1248,7 @@ mod tests {
 
         match result {
             Err(SshParserError::UnsupportedField(field, _)) => {
-                assert_eq!(field, "addkeystoagent");
+                assert_eq!(field, "passwordauthentication");
                 Ok(())
             }
             e => e,
@@ -1652,15 +1676,17 @@ Ciphers     +a-manella,blowfish
 
 Host 192.168.*.*    172.26.*.*      !192.168.1.30
     User    omar
-    # Forward agent is actually not supported; I just want to see that it wont' fail parsing
-    ForwardAgent    yes
+    # ForwardX11 is actually not supported; I just want to see that it wont' fail parsing
+    ForwardX11    yes
     BindAddress     10.8.0.10
     BindInterface   tun0
+    AddKeysToAgent yes
     Ciphers     +coi-piedi,cazdecan,triestin-stretto
     IdentityFile    /home/root/.ssh/pippo.key /home/root/.ssh/pluto.key
     Macs     spyro,deoxys
     Port 2222
     PubkeyAcceptedAlgorithms    -omar-crypt
+    ProxyJump jump.example.com
 
 Host tostapane
     User    ciro-esposito
@@ -1669,6 +1695,7 @@ Host tostapane
     Compression no
     Pippo yes
     Pluto 56
+    ProxyJump jump1.example.com,jump2.example.com
     Macs +spyro,deoxys
 
 Host    192.168.1.30

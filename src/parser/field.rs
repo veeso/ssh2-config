@@ -12,6 +12,7 @@ use std::str::FromStr;
 #[derive(Debug, Eq, PartialEq)]
 pub enum Field {
     Host,
+    AddKeysToAgent,
     BindAddress,
     BindInterface,
     CaSignatureAlgorithms,
@@ -20,6 +21,7 @@ pub enum Field {
     Compression,
     ConnectionAttempts,
     ConnectTimeout,
+    ForwardAgent,
     HostKeyAlgorithms,
     HostName,
     IdentityFile,
@@ -27,6 +29,7 @@ pub enum Field {
     KexAlgorithms,
     Mac,
     Port,
+    ProxyJump,
     PubkeyAcceptedAlgorithms,
     PubkeyAuthentication,
     RemoteForward,
@@ -36,7 +39,6 @@ pub enum Field {
     UseKeychain,
     User,
     // -- not implemented
-    AddKeysToAgent,
     AddressFamily,
     BatchMode,
     CanonicalDomains,
@@ -55,7 +57,6 @@ pub enum Field {
     ExitOnForwardFailure,
     FingerprintHash,
     ForkAfterAuthentication,
-    ForwardAgent,
     ForwardX11,
     ForwardX11Timeout,
     ForwardX11Trusted,
@@ -87,7 +88,6 @@ pub enum Field {
     PKCS11Provider,
     PreferredAuthentications,
     ProxyCommand,
-    ProxyJump,
     ProxyUseFdpass,
     PubkeyAcceptedKeyTypes,
     RekeyLimit,
@@ -115,6 +115,7 @@ impl FromStr for Field {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "host" => Ok(Self::Host),
+            "addkeystoagent" => Ok(Self::AddKeysToAgent),
             "bindaddress" => Ok(Self::BindAddress),
             "bindinterface" => Ok(Self::BindInterface),
             "casignaturealgorithms" => Ok(Self::CaSignatureAlgorithms),
@@ -123,6 +124,7 @@ impl FromStr for Field {
             "compression" => Ok(Self::Compression),
             "connectionattempts" => Ok(Self::ConnectionAttempts),
             "connecttimeout" => Ok(Self::ConnectTimeout),
+            "forwardagent" => Ok(Self::ForwardAgent),
             "hostkeyalgorithms" => Ok(Self::HostKeyAlgorithms),
             "hostname" => Ok(Self::HostName),
             "identityfile" => Ok(Self::IdentityFile),
@@ -130,6 +132,7 @@ impl FromStr for Field {
             "kexalgorithms" => Ok(Self::KexAlgorithms),
             "macs" => Ok(Self::Mac),
             "port" => Ok(Self::Port),
+            "proxyjump" => Ok(Self::ProxyJump),
             "pubkeyacceptedalgorithms" => Ok(Self::PubkeyAcceptedAlgorithms),
             "pubkeyauthentication" => Ok(Self::PubkeyAuthentication),
             "remoteforward" => Ok(Self::RemoteForward),
@@ -139,7 +142,6 @@ impl FromStr for Field {
             "usekeychain" => Ok(Self::UseKeychain),
             "user" => Ok(Self::User),
             // -- not implemented fields
-            "addkeystoagent" => Ok(Self::AddKeysToAgent),
             "addressfamily" => Ok(Self::AddressFamily),
             "batchmode" => Ok(Self::BatchMode),
             "canonicaldomains" => Ok(Self::CanonicalDomains),
@@ -158,7 +160,6 @@ impl FromStr for Field {
             "exitonforwardfailure" => Ok(Self::ExitOnForwardFailure),
             "fingerprinthash" => Ok(Self::FingerprintHash),
             "forkafterauthentication" => Ok(Self::ForkAfterAuthentication),
-            "forwardagent" => Ok(Self::ForwardAgent),
             "forwardx11" => Ok(Self::ForwardX11),
             "forwardx11timeout" => Ok(Self::ForwardX11Timeout),
             "forwardx11trusted" => Ok(Self::ForwardX11Trusted),
@@ -190,7 +191,6 @@ impl FromStr for Field {
             "pkcs11provider" => Ok(Self::PKCS11Provider),
             "preferredauthentications" => Ok(Self::PreferredAuthentications),
             "proxycommand" => Ok(Self::ProxyCommand),
-            "proxyjump" => Ok(Self::ProxyJump),
             "proxyusefdpass" => Ok(Self::ProxyUseFdpass),
             "pubkeyacceptedkeytypes" => Ok(Self::PubkeyAcceptedKeyTypes),
             "rekeylimit" => Ok(Self::RekeyLimit),
@@ -220,6 +220,7 @@ impl fmt::Display for Field {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::Host => "host",
+            Self::AddKeysToAgent => "addkeystoagent",
             Self::BindAddress => "bindaddress",
             Self::BindInterface => "bindinterface",
             Self::CaSignatureAlgorithms => "casignaturealgorithms",
@@ -228,6 +229,7 @@ impl fmt::Display for Field {
             Self::Compression => "compression",
             Self::ConnectionAttempts => "connectionattempts",
             Self::ConnectTimeout => "connecttimeout",
+            Self::ForwardAgent => "forwardagent",
             Self::HostKeyAlgorithms => "hostkeyalgorithms",
             Self::HostName => "hostname",
             Self::IdentityFile => "identityfile",
@@ -235,6 +237,7 @@ impl fmt::Display for Field {
             Self::KexAlgorithms => "kexalgorithms",
             Self::Mac => "macs",
             Self::Port => "port",
+            Self::ProxyJump => "proxyjump",
             Self::PubkeyAcceptedAlgorithms => "pubkeyacceptedalgorithms",
             Self::PubkeyAuthentication => "pubkeyauthentication",
             Self::RemoteForward => "remoteforward",
@@ -244,7 +247,6 @@ impl fmt::Display for Field {
             Self::UseKeychain => "usekeychain",
             Self::User => "user",
             // Continuation of the rest of the enum variants
-            Self::AddKeysToAgent => "addkeystoagent",
             Self::AddressFamily => "addressfamily",
             Self::BatchMode => "batchmode",
             Self::CanonicalDomains => "canonicaldomains",
@@ -263,7 +265,6 @@ impl fmt::Display for Field {
             Self::ExitOnForwardFailure => "exitonforwardfailure",
             Self::FingerprintHash => "fingerprinthash",
             Self::ForkAfterAuthentication => "forkafterauthentication",
-            Self::ForwardAgent => "forwardagent",
             Self::ForwardX11 => "forwardx11",
             Self::ForwardX11Timeout => "forwardx11timeout",
             Self::ForwardX11Trusted => "forwardx11trusted",
@@ -295,7 +296,6 @@ impl fmt::Display for Field {
             Self::PKCS11Provider => "pkcs11provider",
             Self::PreferredAuthentications => "preferredauthentications",
             Self::ProxyCommand => "proxycommand",
-            Self::ProxyJump => "proxyjump",
             Self::ProxyUseFdpass => "proxyusefdpass",
             Self::PubkeyAcceptedKeyTypes => "pubkeyacceptedkeytypes",
             Self::RekeyLimit => "rekeylimit",
@@ -331,6 +331,10 @@ mod tests {
     fn should_parse_field_from_string() {
         assert_eq!(Field::from_str("Host").ok().unwrap(), Field::Host);
         assert_eq!(
+            Field::from_str("AddKeysToAgent").ok().unwrap(),
+            Field::AddKeysToAgent
+        );
+        assert_eq!(
             Field::from_str("BindAddress").ok().unwrap(),
             Field::BindAddress
         );
@@ -359,6 +363,10 @@ mod tests {
             Field::from_str("ConnectTimeout").ok().unwrap(),
             Field::ConnectTimeout
         );
+        assert_eq!(
+            Field::from_str("ForwardAgent").ok().unwrap(),
+            Field::ForwardAgent
+        );
         assert_eq!(Field::from_str("HostName").ok().unwrap(), Field::HostName);
         assert_eq!(
             Field::from_str("IdentityFile").ok().unwrap(),
@@ -369,6 +377,7 @@ mod tests {
             Field::IgnoreUnknown
         );
         assert_eq!(Field::from_str("Macs").ok().unwrap(), Field::Mac);
+        assert_eq!(Field::from_str("ProxyJump").ok().unwrap(), Field::ProxyJump);
         assert_eq!(
             Field::from_str("PubkeyAcceptedAlgorithms").ok().unwrap(),
             Field::PubkeyAcceptedAlgorithms
