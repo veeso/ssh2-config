@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::{Host, HostParams, SshConfig};
+use crate::{Host, HostClause, HostParams, SshConfig};
 
 pub struct SshConfigSerializer<'a>(&'a SshConfig);
 
@@ -12,9 +12,14 @@ impl SshConfigSerializer<'_> {
             return Ok(());
         }
 
-        // serialize default host
+        // serialize first host
         let root = self.0.hosts.first().unwrap();
-        Self::serialize_host_params(f, &root.params, false)?;
+        // check if first host is the default host
+        if root.pattern == vec![HostClause::new(String::from("*"), false)] {
+            Self::serialize_host_params(f, &root.params, false)?;
+        } else {
+            Self::serialize_host(f, root)?;
+        }
 
         // serialize other hosts
         for host in self.0.hosts.iter().skip(1) {
@@ -207,5 +212,31 @@ impl SshConfigSerializer<'_> {
 impl<'a> From<&'a SshConfig> for SshConfigSerializer<'a> {
     fn from(config: &'a SshConfig) -> Self {
         SshConfigSerializer(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::{DefaultAlgorithms, HostClause};
+
+    use super::*;
+
+    #[test]
+    fn is_default_host_serialized_without_host() {
+        let mut root_params = HostParams::new(&DefaultAlgorithms::empty());
+        root_params.server_alive_interval = Some(Duration::from_secs(60));
+        let root = Host::new(vec![HostClause::new(String::from("*"), false)], root_params);
+
+        let mut host_params = HostParams::new(&DefaultAlgorithms::empty());
+        host_params.user = Some("example".to_string());
+        let host = Host::new(
+            vec![HostClause::new(String::from("*.example.com"), false)],
+            host_params,
+        );
+
+        let output = SshConfig::from_hosts(vec![root, host]).to_string();
+        assert!(&output.starts_with("ServerAliveInterval 60"));
     }
 }
