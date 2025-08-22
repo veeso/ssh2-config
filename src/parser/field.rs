@@ -21,6 +21,7 @@ pub enum Field {
     Compression,
     ConnectionAttempts,
     ConnectTimeout,
+    ForwardAgent,
     HostKeyAlgorithms,
     HostName,
     IdentityFile,
@@ -55,7 +56,6 @@ pub enum Field {
     ExitOnForwardFailure,
     FingerprintHash,
     ForkAfterAuthentication,
-    ForwardAgent,
     ForwardX11,
     ForwardX11Timeout,
     ForwardX11Trusted,
@@ -124,6 +124,7 @@ impl FromStr for Field {
             "compression" => Ok(Self::Compression),
             "connectionattempts" => Ok(Self::ConnectionAttempts),
             "connecttimeout" => Ok(Self::ConnectTimeout),
+            "forwardagent" => Ok(Self::ForwardAgent),
             "hostkeyalgorithms" => Ok(Self::HostKeyAlgorithms),
             "hostname" => Ok(Self::HostName),
             "identityfile" => Ok(Self::IdentityFile),
@@ -158,7 +159,6 @@ impl FromStr for Field {
             "exitonforwardfailure" => Ok(Self::ExitOnForwardFailure),
             "fingerprinthash" => Ok(Self::FingerprintHash),
             "forkafterauthentication" => Ok(Self::ForkAfterAuthentication),
-            "forwardagent" => Ok(Self::ForwardAgent),
             "forwardx11" => Ok(Self::ForwardX11),
             "forwardx11timeout" => Ok(Self::ForwardX11Timeout),
             "forwardx11trusted" => Ok(Self::ForwardX11Trusted),
@@ -229,6 +229,7 @@ impl fmt::Display for Field {
             Self::Compression => "compression",
             Self::ConnectionAttempts => "connectionattempts",
             Self::ConnectTimeout => "connecttimeout",
+            Self::ForwardAgent => "forwardagent",
             Self::HostKeyAlgorithms => "hostkeyalgorithms",
             Self::HostName => "hostname",
             Self::IdentityFile => "identityfile",
@@ -263,7 +264,6 @@ impl fmt::Display for Field {
             Self::ExitOnForwardFailure => "exitonforwardfailure",
             Self::FingerprintHash => "fingerprinthash",
             Self::ForkAfterAuthentication => "forkafterauthentication",
-            Self::ForwardAgent => "forwardagent",
             Self::ForwardX11 => "forwardx11",
             Self::ForwardX11Timeout => "forwardx11timeout",
             Self::ForwardX11Trusted => "forwardx11trusted",
@@ -362,6 +362,10 @@ mod tests {
         assert_eq!(
             Field::from_str("ConnectTimeout").ok().unwrap(),
             Field::ConnectTimeout
+        );
+        assert_eq!(
+            Field::from_str("ForwardAgent").ok().unwrap(),
+            Field::ForwardAgent
         );
         assert_eq!(Field::from_str("HostName").ok().unwrap(), Field::HostName);
         assert_eq!(

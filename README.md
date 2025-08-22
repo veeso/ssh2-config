@@ -98,6 +98,7 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 - **Compression**: you can use this attribute to set whether compression is enabled with `session.set_compress(value)`
 - **ConnectionAttempts**: you can use this attribute to cycle over connect in order to retry
 - **ConnectTimeout**: you can use this attribute to set the connection timeout for the socket
+- **ForwardAgent**: you can use this attribute to forward your agent to the remote server
 - **HostName**: you can use this attribute to get the real name of the host to connect to
 - **IdentityFile**: you can use this attribute to set the keys to try when connecting to remote host.
 - **KexAlgorithms**: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.to_string().as_str())`

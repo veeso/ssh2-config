@@ -34,6 +34,8 @@ pub struct HostParams {
     pub connection_attempts: Option<usize>,
     /// Specifies the timeout used when connecting to the SSH server
     pub connect_timeout: Option<Duration>,
+    /// Specifies whether the connection to the authentication agent (if any) will be forwarded to the remote machine
+    pub forward_agent: Option<bool>,
     /// Specifies the host key signature algorithms that the client wants to use in order of preference
     pub host_key_algorithms: Algorithms,
     /// Specifies the real host name to log into
@@ -84,6 +86,7 @@ impl HostParams {
             compression: None,
             connection_attempts: None,
             connect_timeout: None,
+            forward_agent: None,
             host_key_algorithms: Algorithms::new(&default_algorithms.host_key_algorithms),
             host_name: None,
             identity_file: None,
@@ -129,6 +132,7 @@ impl HostParams {
         self.compression = self.compression.or(b.compression);
         self.connection_attempts = self.connection_attempts.or(b.connection_attempts);
         self.connect_timeout = self.connect_timeout.or(b.connect_timeout);
+        self.forward_agent = self.forward_agent.or(b.forward_agent);
         self.host_name = self.host_name.clone().or_else(|| b.host_name.clone());
         self.identity_file = self
             .identity_file
@@ -213,6 +217,7 @@ mod tests {
         assert!(params.compression.is_none());
         assert!(params.connection_attempts.is_none());
         assert!(params.connect_timeout.is_none());
+        assert!(params.forward_agent.is_none());
         assert_eq!(
             params.host_key_algorithms.algorithms(),
             DefaultAlgorithms::default().host_key_algorithms

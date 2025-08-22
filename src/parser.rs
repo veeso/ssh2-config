@@ -219,6 +219,11 @@ impl SshConfigParser {
                 trace!("connection_attempts: {value}",);
                 params.connection_attempts = Some(value);
             }
+            Field::ForwardAgent => {
+                let value = Self::parse_boolean(args)?;
+                trace!("forward_agent: {value}",);
+                params.forward_agent = Some(value);
+            }
             Field::Host => { /* already handled before */ }
             Field::HostKeyAlgorithms => {
                 let rule = Self::parse_algos(args)?;
@@ -313,7 +318,6 @@ impl SshConfigParser {
             | Field::ExitOnForwardFailure
             | Field::FingerprintHash
             | Field::ForkAfterAuthentication
-            | Field::ForwardAgent
             | Field::ForwardX11
             | Field::ForwardX11Timeout
             | Field::ForwardX11Trusted
@@ -1657,8 +1661,8 @@ Ciphers     +a-manella,blowfish
 
 Host 192.168.*.*    172.26.*.*      !192.168.1.30
     User    omar
-    # Forward agent is actually not supported; I just want to see that it wont' fail parsing
-    ForwardAgent    yes
+    # ForwardX11 is actually not supported; I just want to see that it wont' fail parsing
+    ForwardX11    yes
     BindAddress     10.8.0.10
     BindInterface   tun0
     AddKeysToAgent yes
