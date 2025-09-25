@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.6.2](#062)
   - [0.6.1](#061)
   - [0.6.0](#060)
   - [0.5.4](#054)
@@ -21,6 +22,16 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.6.2
+
+Released on 25/09/2025
+
+- fix: Identify the root/default host when serialising (#27)
+- fix: Combine host declarations when serialising (#28)
+- fix: Add AddKeysToAgent, ForwardAgent, ProxyJump fields (#29)
+
+Developed by [@milliams](https://github.com/milliams)
 
 ## 0.6.1
 

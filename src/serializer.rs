@@ -222,9 +222,8 @@ impl<'a> From<&'a SshConfig> for SshConfigSerializer<'a> {
 mod tests {
     use std::time::Duration;
 
-    use crate::{DefaultAlgorithms, HostClause};
-
     use super::*;
+    use crate::{DefaultAlgorithms, HostClause};
 
     #[test]
     fn are_host_patterns_combined() {
