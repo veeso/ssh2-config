@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.6.1](#061)
   - [0.6.0](#060)
   - [0.5.4](#054)
   - [0.5.1](#051)
@@ -20,6 +21,12 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.6.1
+
+Released on 25/09/2025
+
+- [Issue 30](https://github.com/veeso/ssh2-config/issues/30): Host blocks from included files  didn't get registered. Fixed that.
 
 ## 0.6.0
 
