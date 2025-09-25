@@ -30,12 +30,15 @@ impl SshConfigSerializer<'_> {
     }
 
     fn serialize_host(f: &mut fmt::Formatter<'_>, host: &Host) -> fmt::Result {
-        for pattern in &host.pattern {
-            writeln!(f, "Host {pattern}",)?;
-
-            Self::serialize_host_params(f, &host.params, true)?;
-            writeln!(f,)?;
-        }
+        let patterns = &host
+            .pattern
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        writeln!(f, "Host {patterns}",)?;
+        Self::serialize_host_params(f, &host.params, true)?;
+        writeln!(f,)?;
 
         Ok(())
     }
@@ -222,6 +225,23 @@ mod tests {
     use crate::{DefaultAlgorithms, HostClause};
 
     use super::*;
+
+    #[test]
+    fn are_host_patterns_combined() {
+        let mut host_params = HostParams::new(&DefaultAlgorithms::empty());
+        host_params.host_name = Some("bastion.example.com".to_string());
+
+        let host = Host::new(
+            vec![
+                HostClause::new(String::from("*.example.com"), false),
+                HostClause::new(String::from("foo.example.com"), true),
+            ],
+            host_params,
+        );
+
+        let output = SshConfig::from_hosts(vec![/*default_host,*/ host]).to_string();
+        assert!(&output.contains("Host *.example.com !foo.example.com"));
+    }
 
     #[test]
     fn is_default_host_serialized_without_host() {
