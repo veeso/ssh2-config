@@ -88,7 +88,7 @@ impl SshConfigParser {
         // are parsed as command line options;
         // overriding all following host-specific options.
         //
-        // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1051-L1054
+        // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1173-L1176
         let mut default_params = HostParams::new(&config.default_algorithms);
         default_params.ignore_unknown = ignore_unknown;
         config.hosts.push(Host::new(
