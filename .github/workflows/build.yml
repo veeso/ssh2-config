@@ -14,7 +14,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
       - name: Set up environment for tests
         run: mkdir -p $HOME/.ssh && touch $HOME/.ssh/config
       - name: build

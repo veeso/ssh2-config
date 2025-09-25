@@ -22,6 +22,15 @@ use field::Field;
 
 pub type SshParserResult<T> = Result<T, SshParserError>;
 
+/// [`SshConfigParser::update_host`] result
+#[derive(Debug, PartialEq, Eq)]
+enum UpdateHost {
+    /// Update current host
+    UpdateHost,
+    /// Add new hosts
+    NewHosts(Vec<Host>),
+}
+
 /// Ssh config parser error
 #[derive(Debug, Error)]
 pub enum SshParserError {
@@ -65,23 +74,26 @@ bitflags! {
 // -- parser
 
 /// Ssh config parser
-pub struct SshConfigParser;
+pub(crate) struct SshConfigParser;
 
 impl SshConfigParser {
     /// Parse reader lines and apply parameters to configuration
-    pub fn parse(
+    pub(crate) fn parse(
         config: &mut SshConfig,
         reader: &mut impl BufRead,
         rules: ParseRule,
+        ignore_unknown: Option<Vec<String>>,
     ) -> SshParserResult<()> {
         // Options preceding the first `Host` section
         // are parsed as command line options;
         // overriding all following host-specific options.
         //
-        // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1051-L1054
+        // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1173-L1176
+        let mut default_params = HostParams::new(&config.default_algorithms);
+        default_params.ignore_unknown = ignore_unknown;
         config.hosts.push(Host::new(
             vec![HostClause::new(String::from("*"), false)],
-            HostParams::new(&config.default_algorithms),
+            default_params,
         ));
 
         // Current host pointer
@@ -124,7 +136,7 @@ impl SshConfigParser {
                 // Add a new host
                 config.hosts.push(Host::new(pattern, params));
                 // Update current host pointer
-                current_host = config.hosts.last_mut().unwrap();
+                current_host = config.hosts.last_mut().expect("Just added hosts");
             } else {
                 // Update field
                 match Self::update_host(
@@ -134,7 +146,13 @@ impl SshConfigParser {
                     rules,
                     &config.default_algorithms,
                 ) {
-                    Ok(()) => Ok(()),
+                    Ok(UpdateHost::UpdateHost) => Ok(()),
+                    Ok(UpdateHost::NewHosts(new_hosts)) => {
+                        trace!("Adding new hosts from 'UpdateHost::NewHosts': {new_hosts:?}",);
+                        config.hosts.extend(new_hosts);
+                        current_host = config.hosts.last_mut().expect("Just added hosts");
+                        Ok(())
+                    }
                     // If we're allowing unsupported fields to be parsed, add them to the map
                     Err(SshParserError::UnsupportedField(field, args))
                         if rules.intersects(ParseRule::ALLOW_UNSUPPORTED_FIELDS) =>
@@ -146,7 +164,7 @@ impl SshConfigParser {
                     // Also it'd be weird to error on correct ssh_config's just because they're
                     // not supported by this library
                     Err(SshParserError::UnsupportedField(_, _)) => Ok(()),
-                    e => e,
+                    Err(e) => Err(e),
                 }?;
             }
         }
@@ -170,7 +188,7 @@ impl SshConfigParser {
         host: &mut Host,
         rules: ParseRule,
         default_algos: &DefaultAlgorithms,
-    ) -> SshParserResult<()> {
+    ) -> SshParserResult<UpdateHost> {
         trace!("parsing field {field:?} with args {args:?}",);
         let params = &mut host.params;
         match field {
@@ -226,7 +244,14 @@ impl SshConfigParser {
                 params.host_name = Some(value);
             }
             Field::Include => {
-                Self::include_files(args, host, rules, default_algos)?;
+                return Self::include_files(
+                    args,
+                    host,
+                    rules,
+                    default_algos,
+                    host.params.ignore_unknown.clone(),
+                )
+                .map(UpdateHost::NewHosts);
             }
             Field::IdentityFile => {
                 let value = Self::parse_path_list(args)?;
@@ -363,7 +388,7 @@ impl SshConfigParser {
                 return Err(SshParserError::UnsupportedField(field.to_string(), args));
             }
         }
-        Ok(())
+        Ok(UpdateHost::UpdateHost)
     }
 
     /// Resolve the include path for a given path match.
@@ -395,18 +420,21 @@ impl SshConfigParser {
         host: &mut Host,
         rules: ParseRule,
         default_algos: &DefaultAlgorithms,
-    ) -> SshParserResult<()> {
+        ignore_unknown: Option<Vec<String>>,
+    ) -> SshParserResult<Vec<Host>> {
         let path_match = Self::resolve_include_path(&Self::parse_string(args)?);
 
         trace!("include files: {path_match}",);
         let files = glob(&path_match)?;
+
+        let mut new_hosts = vec![];
 
         for file in files {
             let file = file?;
             trace!("including file: {}", file.display());
             let mut reader = BufReader::new(File::open(file)?);
             let mut sub_config = SshConfig::default().default_algorithms(default_algos.clone());
-            Self::parse(&mut sub_config, &mut reader, rules)?;
+            Self::parse(&mut sub_config, &mut reader, rules, ignore_unknown.clone())?;
 
             // merge sub-config into host
             for pattern in &host.pattern {
@@ -418,9 +446,15 @@ impl SshConfigParser {
                 let params = sub_config.query(&pattern.pattern);
                 host.params.overwrite_if_none(&params);
             }
+
+            // merge additional hosts
+            for sub_host in sub_config.hosts.into_iter().skip(1) {
+                trace!("adding sub-host: {sub_host:?}",);
+                new_hosts.push(sub_host);
+            }
         }
 
-        Ok(())
+        Ok(new_hosts)
     }
 
     /// Tokenize line if possible. Returns [`Field`] name and args as a [`Vec`] of [`String`].
@@ -1202,8 +1236,8 @@ mod tests {
         );
 
         match result {
-            Ok(()) | Err(SshParserError::UnsupportedField(_, _)) => Ok(()),
-            e => e,
+            Ok(_) | Err(SshParserError::UnsupportedField(_, _)) => Ok(()),
+            Err(e) => Err(e),
         }?;
 
         assert_eq!(host.params, HostParams::new(&DefaultAlgorithms::empty()));
@@ -1227,7 +1261,8 @@ mod tests {
                 assert_eq!(field, "addkeystoagent");
                 Ok(())
             }
-            e => e,
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
         }?;
 
         assert_eq!(host.params, HostParams::new(&DefaultAlgorithms::empty()));
@@ -1754,6 +1789,25 @@ Host *
             .parse(&mut reader, ParseRule::STRICT)
             .expect("Failed to parse config");
 
+        let default_params = config.query("unknown-host");
+        // verify default params
+        assert_eq!(
+            default_params.connect_timeout.unwrap(),
+            Duration::from_secs(60) // first read
+        );
+        assert_eq!(
+            default_params.server_alive_interval.unwrap(),
+            Duration::from_secs(40) // first read
+        );
+        assert_eq!(default_params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(default_params.ciphers.algorithms().is_empty(), true);
+        assert_eq!(
+            default_params.ignore_unknown.as_deref().unwrap(),
+            &["Pippo", "Pluto"]
+        );
+        assert_eq!(default_params.compression.unwrap(), true);
+        assert_eq!(default_params.connection_attempts.unwrap(), 10);
+
         // verify include 1 overwrites the default value
         let glob_params = config.query("192.168.1.1");
         assert_eq!(
@@ -1789,6 +1843,45 @@ Host *
                 "triestin-stretto"
             ]
         );
+
+        // verify included host (microwave)
+        let microwave_params = config.query("microwave");
+        assert_eq!(
+            microwave_params.connect_timeout.unwrap(),
+            Duration::from_secs(60) // (not) updated in inc4
+        );
+        assert_eq!(
+            microwave_params.server_alive_interval.unwrap(),
+            Duration::from_secs(40) // (not) updated in inc4
+        );
+        assert_eq!(
+            microwave_params.port.unwrap(),
+            345 // updated in inc4
+        );
+        assert_eq!(microwave_params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(microwave_params.ciphers.algorithms().is_empty(), true);
+        assert_eq!(microwave_params.user.as_deref().unwrap(), "mario-rossi");
+        assert_eq!(
+            microwave_params.host_name.as_deref().unwrap(),
+            "192.168.24.33"
+        );
+        assert_eq!(microwave_params.remote_forward.unwrap(), 88);
+        assert_eq!(microwave_params.compression.unwrap(), true);
+
+        // verify included host (fridge)
+        let fridge_params = config.query("fridge");
+        assert_eq!(
+            fridge_params.connect_timeout.unwrap(),
+            Duration::from_secs(60)
+        ); // default
+        assert_eq!(
+            fridge_params.server_alive_interval.unwrap(),
+            Duration::from_secs(40)
+        ); // default
+        assert_eq!(fridge_params.tcp_keep_alive.unwrap(), true);
+        assert_eq!(fridge_params.ciphers.algorithms().is_empty(), true);
+        assert_eq!(fridge_params.user.as_deref().unwrap(), "luigi-verdi");
+        assert_eq!(fridge_params.host_name.as_deref().unwrap(), "192.168.24.34");
     }
 
     #[allow(dead_code)]
@@ -1796,6 +1889,8 @@ Host *
         config: NamedTempFile,
         inc1: NamedTempFile,
         inc2: NamedTempFile,
+        inc3: NamedTempFile,
+        inc4: NamedTempFile,
     }
 
     fn create_include_config() -> ConfigWithInclude {
@@ -1804,6 +1899,10 @@ Host *
         let mut inc1_file: tempfile::NamedTempFile =
             tempfile::NamedTempFile::new().expect("Failed to create tempfile");
         let mut inc2_file: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let mut inc3_file: tempfile::NamedTempFile =
+            tempfile::NamedTempFile::new().expect("Failed to create tempfile");
+        let mut inc4_file: tempfile::NamedTempFile =
             tempfile::NamedTempFile::new().expect("Failed to create tempfile");
 
         let config = format!(
@@ -1829,12 +1928,18 @@ Host tostapane
     HostName    192.168.24.32
     RemoteForward   88
     Compression no
+    # Ignore unknown fields should be inherited from the global section
     Pippo yes
     Pluto 56
     Include {inc2}
+
+Include {inc3}
+Include {inc4}
 "##,
             inc1 = inc1_file.path().display(),
-            inc2 = inc2_file.path().display()
+            inc2 = inc2_file.path().display(),
+            inc3 = inc3_file.path().display(),
+            inc4 = inc4_file.path().display(),
         );
         config_file.write_all(config.as_bytes()).unwrap();
 
@@ -1854,10 +1959,43 @@ Host tostapane
         "##;
         inc2_file.write_all(inc2.as_bytes()).unwrap();
 
+        // write include 3 with host directive
+        let inc3 = r##"
+Host microwave
+    User    mario-rossi
+    HostName    192.168.24.33
+    RemoteForward   88
+    Compression no
+    # Ignore unknown fields should be inherited from the global section
+    Pippo yes
+    Pluto 56
+"##;
+        inc3_file.write_all(inc3.as_bytes()).unwrap();
+
+        // write include 4 which updates a param from microwave and then create a new host
+        let inc4 = r##"
+    # Update microwave
+    ServerAliveInterval 30
+    Port 345
+
+# Force microwave update (it won't work)
+Host microwave
+    ConnectTimeout 30
+
+Host fridge
+    User    luigi-verdi
+    HostName    192.168.24.34
+    RemoteForward   88
+    Compression no
+"##;
+        inc4_file.write_all(inc4.as_bytes()).unwrap();
+
         ConfigWithInclude {
             config: config_file,
             inc1: inc1_file,
             inc2: inc2_file,
+            inc3: inc3_file,
+            inc4: inc4_file,
         }
     }
 }

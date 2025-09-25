@@ -333,7 +333,7 @@ impl SshConfig {
     /// let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
     /// ```
     pub fn parse(mut self, reader: &mut impl BufRead, rules: ParseRule) -> SshParserResult<Self> {
-        parser::SshConfigParser::parse(&mut self, reader, rules).map(|_| self)
+        parser::SshConfigParser::parse(&mut self, reader, rules, None).map(|_| self)
     }
 
     /// Parse `~/.ssh/config`` file and return parsed configuration [`SshConfig`] or parser error
