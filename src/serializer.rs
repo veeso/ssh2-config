@@ -221,7 +221,7 @@ impl<'a> From<&'a SshConfig> for SshConfigSerializer<'a> {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-  
+
     use crate::{DefaultAlgorithms, HostClause};
 
     use super::*;
