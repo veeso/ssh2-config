@@ -89,6 +89,7 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 
 ### Exposed attributes
 
+- **AddKeysToAgent**: you can use this attribute add keys to the SSH agent
 - **BindAddress**: you can use this attribute to bind the socket to a certain address
 - **BindInterface**: you can use this attribute to bind the socket to a certain network interface
 - **CASignatureAlgorithms**: you can use this attribute to handle CA certificates
@@ -97,11 +98,13 @@ Even if many attributes are not exposed, since not supported, there is anyway a 
 - **Compression**: you can use this attribute to set whether compression is enabled with `session.set_compress(value)`
 - **ConnectionAttempts**: you can use this attribute to cycle over connect in order to retry
 - **ConnectTimeout**: you can use this attribute to set the connection timeout for the socket
+- **ForwardAgent**: you can use this attribute to forward your agent to the remote server
 - **HostName**: you can use this attribute to get the real name of the host to connect to
 - **IdentityFile**: you can use this attribute to set the keys to try when connecting to remote host.
 - **KexAlgorithms**: you can use this attribute to configure Key exchange methods with `session.method_pref(MethodType::Kex, algos.to_string().as_str())`
 - **MACs**: you can use this attribute to configure the MAC algos with `session.method_pref(MethodType::MacCs, algos..to_string().as_str())` and `session.method_pref(MethodType::MacSc, algos..to_string().as_str())`
 - **Port**: you can use this attribute to resolve the port to connect to
+- **ProxyJump**: you can use this attribute to specify hosts to jump via
 - **PubkeyAuthentication**: you can use this attribute to set whether to use the pubkey authentication
 - **RemoteForward**: you can use this method to implement port forwarding with `session.channel_forward_listen()`
 - **ServerAliveInterval**: you can use this method to implement keep alive message interval
