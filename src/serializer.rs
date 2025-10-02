@@ -53,6 +53,13 @@ impl SshConfigSerializer<'_> {
         if let Some(value) = params.bind_address.as_ref() {
             writeln!(f, "{padding}Hostname {value}",)?;
         }
+        if let Some(add_keys_to_agent) = params.add_keys_to_agent.as_ref() {
+            writeln!(
+                f,
+                "{padding}AddKeysToAgent {}",
+                if *add_keys_to_agent { "yes" } else { "no" }
+            )?;
+        }
         if let Some(value) = params.bind_interface.as_ref() {
             writeln!(f, "{padding}BindAddress {value}",)?;
         }
@@ -87,6 +94,13 @@ impl SshConfigSerializer<'_> {
         }
         if let Some(connect_timeout) = params.connect_timeout {
             writeln!(f, "{padding}ConnectTimeout {}", connect_timeout.as_secs())?;
+        }
+        if let Some(forward_agent) = params.forward_agent.as_ref() {
+            writeln!(
+                f,
+                "{padding}ForwardAgent {}",
+                if *forward_agent { "yes" } else { "no" }
+            )?;
         }
         if !params.host_key_algorithms.is_default() {
             writeln!(
@@ -139,6 +153,17 @@ impl SshConfigSerializer<'_> {
         }
         if let Some(port) = params.port {
             writeln!(f, "{padding}Port {port}", port = port)?;
+        }
+        if let Some(proxy_jump) = params.proxy_jump.as_ref() {
+            writeln!(
+                f,
+                "{padding}ProxyJump {}",
+                proxy_jump
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )?;
         }
         if !params.pubkey_accepted_algorithms.is_default() {
             writeln!(
