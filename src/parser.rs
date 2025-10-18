@@ -417,12 +417,17 @@ impl SshConfigParser {
         if path_match.starts_with(PATH_SEPARATOR) {
             path_match.to_string()
         } else {
-            // prepend $HOME/.ssh
             let home_dir = dirs::home_dir().unwrap_or(PathBuf::from(PATH_SEPARATOR));
-            format!(
-                "{dir}{PATH_SEPARATOR}{path_match}",
-                dir = home_dir.join(".ssh").display()
-            )
+            // if path_match starts with ~, strip it and prepend $HOME
+            if let Some(stripped) = path_match.strip_prefix("~") {
+                format!("{dir}{PATH_SEPARATOR}{stripped}", dir = home_dir.display())
+            } else {
+                // prepend $HOME/.ssh
+                format!(
+                    "{dir}{PATH_SEPARATOR}{path_match}",
+                    dir = home_dir.join(".ssh").display()
+                )
+            }
         }
     }
 
