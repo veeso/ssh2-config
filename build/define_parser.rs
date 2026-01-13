@@ -14,7 +14,7 @@ pub fn parse_defines(reader: impl BufRead) -> anyhow::Result<HashMap<String, Str
 
     for line in reader.lines() {
         let line = line?;
-        // check if the line is a define
+        // check if the line is a `define`
         if line.trim().starts_with("#define") {
             if let Some(prev_scope) = scope.take() {
                 // if we have a previous scope, store it

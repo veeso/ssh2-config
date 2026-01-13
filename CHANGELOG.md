@@ -1,27 +1,34 @@
 # Changelog
 
 - [Changelog](#changelog)
-  - [0.6.2](#062)
-  - [0.6.1](#061)
-  - [0.6.0](#060)
-  - [0.5.4](#054)
-  - [0.5.1](#051)
-  - [0.5.0](#050)
-  - [0.4.0](#040)
-  - [0.3.0](#030)
-  - [0.2.3](#023)
-  - [0.2.2](#022)
-  - [0.2.1](#021)
-  - [0.2.0](#020)
-  - [0.1.6](#016)
-  - [0.1.5](#015)
-  - [0.1.4](#014)
-  - [0.1.3](#013)
-  - [0.1.2](#012)
-  - [0.1.1](#011)
-  - [0.1.0](#010)
+    - [0.6.2](#062)
+    - [0.6.1](#061)
+    - [0.6.0](#060)
+    - [0.5.4](#054)
+    - [0.5.1](#051)
+    - [0.5.0](#050)
+    - [0.4.0](#040)
+    - [0.3.0](#030)
+    - [0.2.3](#023)
+    - [0.2.2](#022)
+    - [0.2.1](#021)
+    - [0.2.0](#020)
+    - [0.1.6](#016)
+    - [0.1.5](#015)
+    - [0.1.4](#014)
+    - [0.1.3](#013)
+    - [0.1.2](#012)
+    - [0.1.1](#011)
+    - [0.1.0](#010)
 
 ---
+
+## 0.6.3
+
+Released on 13/01/2026
+
+- [Issue 34](https://github.com/veeso/ssh2-config/issues/36): Fix parsing of multiple algos on the same row.
+- Updated default algos to `V_10_2_P1`
 
 ## 0.6.2
 
@@ -37,7 +44,8 @@ Developed by [@milliams](https://github.com/milliams)
 
 Released on 25/09/2025
 
-- [Issue 30](https://github.com/veeso/ssh2-config/issues/30): Host blocks from included files  didn't get registered. Fixed that.
+- [Issue 30](https://github.com/veeso/ssh2-config/issues/30): Host blocks from included files didn't get registered.
+  Fixed that.
 
 ## 0.6.0
 
@@ -67,10 +75,10 @@ Released on 27/03/2025
 - [issue 22](https://github.com/veeso/ssh2-config/issues/22): should parse tokens with `=` and quotes (`"`)
 - [issue 21](https://github.com/veeso/ssh2-config/issues/21): Finally fixed how parameters are applied to host patterns
 - Replaced algorithms `Vec<String>` with `Algorithms` type.
-  - The new type is a variant with `Append`, `Head`, `Exclude` and `Set`.
-  - This allows to **ACTUALLY** handle algorithms correctly.
-  - To pass to ssh options, use `algorithms()` method
-  - Beware that when accessing the internal vec, you MUST care of what it means for that variant.
+    - The new type is a variant with `Append`, `Head`, `Exclude` and `Set`.
+    - This allows to **ACTUALLY** handle algorithms correctly.
+    - To pass to ssh options, use `algorithms()` method
+    - Beware that when accessing the internal vec, you MUST care of what it means for that variant.
 - Replaced `HostParams::merge` with `HostParams::overwrite_if_none` to avoid overwriting existing values.
 - Added default Algorithms to the SshConfig structure. See readme for details on how to use it.
 
@@ -91,11 +99,13 @@ Released on 19/12/2024
 - thiserror `2.0`
 - ‼️ **BREAKING CHANGE**: Added support for unsupported fields:
 
-    `AddressFamily, BatchMode, CanonicalDomains, CanonicalizeFallbackLock, CanonicalizeHostname, CanonicalizeMaxDots, CanonicalizePermittedCNAMEs, CheckHostIP, ClearAllForwardings, ControlMaster, ControlPath, ControlPersist, DynamicForward, EnableSSHKeysign, EscapeChar, ExitOnForwardFailure, FingerprintHash, ForkAfterAuthentication, ForwardAgent, ForwardX11, ForwardX11Timeout, ForwardX11Trusted, GatewayPorts, GlobalKnownHostsFile, GSSAPIAuthentication, GSSAPIDelegateCredentials, HashKnownHosts, HostbasedAcceptedAlgorithms, HostbasedAuthentication, HostKeyAlias, HostbasedKeyTypes, IdentitiesOnly, IdentityAgent, Include, IPQoS, KbdInteractiveAuthentication, KbdInteractiveDevices, KnownHostsCommand, LocalCommand, LocalForward, LogLevel, LogVerbose, NoHostAuthenticationForLocalhost, NumberOfPasswordPrompts, PasswordAuthentication, PermitLocalCommand, PermitRemoteOpen, PKCS11Provider, PreferredAuthentications, ProxyCommand, ProxyJump, ProxyUseFdpass, PubkeyAcceptedKeyTypes, RekeyLimit, RequestTTY, RevokedHostKeys, SecruityKeyProvider, SendEnv, ServerAliveCountMax, SessionType, SetEnv, StdinNull, StreamLocalBindMask, StrictHostKeyChecking, SyslogFacility, UpdateHostKeys, UserKnownHostsFile, VerifyHostKeyDNS, VisualHostKey, XAuthLocation`
+  `AddressFamily, BatchMode, CanonicalDomains, CanonicalizeFallbackLock, CanonicalizeHostname, CanonicalizeMaxDots, CanonicalizePermittedCNAMEs, CheckHostIP, ClearAllForwardings, ControlMaster, ControlPath, ControlPersist, DynamicForward, EnableSSHKeysign, EscapeChar, ExitOnForwardFailure, FingerprintHash, ForkAfterAuthentication, ForwardAgent, ForwardX11, ForwardX11Timeout, ForwardX11Trusted, GatewayPorts, GlobalKnownHostsFile, GSSAPIAuthentication, GSSAPIDelegateCredentials, HashKnownHosts, HostbasedAcceptedAlgorithms, HostbasedAuthentication, HostKeyAlias, HostbasedKeyTypes, IdentitiesOnly, IdentityAgent, Include, IPQoS, KbdInteractiveAuthentication, KbdInteractiveDevices, KnownHostsCommand, LocalCommand, LocalForward, LogLevel, LogVerbose, NoHostAuthenticationForLocalhost, NumberOfPasswordPrompts, PasswordAuthentication, PermitLocalCommand, PermitRemoteOpen, PKCS11Provider, PreferredAuthentications, ProxyCommand, ProxyJump, ProxyUseFdpass, PubkeyAcceptedKeyTypes, RekeyLimit, RequestTTY, RevokedHostKeys, SecruityKeyProvider, SendEnv, ServerAliveCountMax, SessionType, SetEnv, StdinNull, StreamLocalBindMask, StrictHostKeyChecking, SyslogFacility, UpdateHostKeys, UserKnownHostsFile, VerifyHostKeyDNS, VisualHostKey, XAuthLocation`
 
-    If you want to keep the behaviour as-is, use `ParseRule::STRICT | ParseRule::ALLOW_UNSUPPORTED_FIELDS` when calling `parse()` if you were using `ParseRule::STRICT` before.
+  If you want to keep the behaviour as-is, use `ParseRule::STRICT | ParseRule::ALLOW_UNSUPPORTED_FIELDS` when calling
+  `parse()` if you were using `ParseRule::STRICT` before.
 
-    Otherwise you can now access unsupported fields by using the `unsupported_fields` field on the `HostParams` structure like this:
+  Otherwise you can now access unsupported fields by using the `unsupported_fields` field on the `HostParams` structure
+  like this:
 
     ```rust
     use ssh2_config::{ParseRule, SshConfig};
@@ -133,15 +143,16 @@ Released on 28/07/2023
 
 Released on 09/05/2023
 
-- Added `ParseRule` field to `parse()` method to specify some rules for parsing. ❗ To keep the behaviour as-is use `ParseRule::STRICT`
+- Added `ParseRule` field to `parse()` method to specify some rules for parsing. ❗ To keep the behaviour as-is use
+  `ParseRule::STRICT`
 
 ## 0.1.6
 
 Released on 03/03/2023
 
 - Added legacy field support
-  - HostbasedKeyTypes
-  - PubkeyAcceptedKeyTypes
+    - HostbasedKeyTypes
+    - PubkeyAcceptedKeyTypes
 
 ## 0.1.5
 
