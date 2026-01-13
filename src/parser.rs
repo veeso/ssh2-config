@@ -417,12 +417,17 @@ impl SshConfigParser {
         if path_match.starts_with(PATH_SEPARATOR) {
             path_match.to_string()
         } else {
-            // prepend $HOME/.ssh
             let home_dir = dirs::home_dir().unwrap_or(PathBuf::from(PATH_SEPARATOR));
-            format!(
-                "{dir}{PATH_SEPARATOR}{path_match}",
-                dir = home_dir.join(".ssh").display()
-            )
+            // if path_match starts with `~`, strip it and prepend $HOME
+            if let Some(stripped) = path_match.strip_prefix("~") {
+                format!("{dir}{PATH_SEPARATOR}{stripped}", dir = home_dir.display())
+            } else {
+                // prepend $HOME/.ssh
+                format!(
+                    "{dir}{PATH_SEPARATOR}{path_match}",
+                    dir = home_dir.join(".ssh").display()
+                )
+            }
         }
     }
 
@@ -1667,6 +1672,16 @@ mod tests {
         let s = "config.local";
         let resolved = PathBuf::from(SshConfigParser::resolve_include_path(s));
         assert_eq!(resolved, expected);
+    }
+
+    #[test]
+    fn test_should_resolve_include_path_with_tilde() {
+        let p = "~/.ssh/config.local";
+        let resolved = SshConfigParser::resolve_include_path(p);
+        let mut expected = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
+        expected.push(".ssh");
+        expected.push("config.local");
+        assert_eq!(PathBuf::from(resolved), expected);
     }
 
     fn create_ssh_config_with_quotes_and_eq() -> NamedTempFile {
