@@ -7,7 +7,7 @@
 [![ko-fi](https://img.shields.io/badge/donate-ko--fi-red)](https://ko-fi.com/veeso)
 [![conventional-commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
 
-[![build-test](https://github.com/veeso/ssh2-config/actions/workflows/cargo.yml/badge.svg)](https://github.com/veeso/ssh2-config/actions/workflows/build.yml)
+[![Build](https://github.com/veeso/ssh2-config/actions/workflows/build.yml/badge.svg)](https://github.com/veeso/ssh2-config/actions/workflows/build.yml)
 [![coveralls](https://coveralls.io/repos/github/veeso/ssh2-config/badge.svg)](https://coveralls.io/github/veeso/ssh2-config)
 [![docs](https://docs.rs/ssh2-config/badge.svg)](https://docs.rs/ssh2-config)
 
