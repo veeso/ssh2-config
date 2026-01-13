@@ -88,7 +88,7 @@ fn clone_openssh(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Split algorithms string into vector of quoted strings
-fn split_algos(s: &String) -> Vec<String> {
+fn split_algos(s: &str) -> Vec<String> {
     s.replace(',', " ")
         .split_whitespace()
         .map(|s| format!(r#""{s}""#))
