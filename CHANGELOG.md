@@ -27,7 +27,8 @@
 
 Released on 13/01/2026
 
-- [Issue 34](https://github.com/veeso/ssh2-config/issues/36): Fix parsing of multiple algos on the same row.
+- [Issue 33](https://github.com/veeso/ssh2-config/issues/33): Parse `~` in include paths.
+- [Issue 34](https://github.com/veeso/ssh2-config/issues/34): Fix parsing of multiple algos on the same row.
 - Updated default algos to `V_10_2_P1`
 
 ## 0.6.2
