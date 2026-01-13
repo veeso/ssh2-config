@@ -458,4 +458,38 @@ mod tests {
             HostParams::new(&DefaultAlgorithms::default())
         );
     }
+
+    #[test]
+    fn roundtrip() {
+        test_log();
+
+        // Root host
+        let mut default_host_params = HostParams::new(&DefaultAlgorithms::default());
+        default_host_params.add_keys_to_agent = Some(true);
+        let root_host_config = Host::new(
+            vec![HostClause::new(String::from("*"), false)],
+            default_host_params,
+        );
+
+        // A host using proxy jumps
+        let mut host_params = HostParams::new(&DefaultAlgorithms::default());
+        host_params.host_name = Some(String::from("192.168.10.1"));
+        host_params.proxy_jump = Some(vec![String::from("jump.example.com")]);
+        let host_config = Host::new(
+            vec![HostClause::new(String::from("server"), false)],
+            host_params,
+        );
+
+        // Create the overall config and serialise it
+        let config = SshConfig::from_hosts(vec![root_host_config, host_config]);
+        let config_string = config.to_string();
+
+        // Parse the serialised string
+        let mut reader = std::io::BufReader::new(config_string.as_bytes());
+        let config_parsed = SshConfig::default()
+            .parse(&mut reader, ParseRule::STRICT)
+            .expect("Could not parse config.");
+
+        assert_eq!(config, config_parsed);
+    }
 }
