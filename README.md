@@ -98,11 +98,13 @@ use ssh2_config::{ParseRule, SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 
-let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-let config = SshConfig::default ().parse( & mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
+fn main() {
+    let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+    let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
 
-// Query attributes for a certain host
-let params = config.query("192.168.1.2");
+    // Query attributes for a certain host
+    let params = config.query("192.168.1.2");
+}
 ```
 
 then you can use the parsed parameters to configure the session:
@@ -191,12 +193,14 @@ use ssh2_config::{ParseRule, SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 
-let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-let config = SshConfig::default ().parse( & mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
+fn main() {
+    let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+    let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
 
-// Query attributes for a certain host
-let params = config.query("192.168.1.2");
-let forwards = params.unsupported_fields.get("dynamicforward");
+    // Query attributes for a certain host
+    let params = config.query("192.168.1.2");
+    let forwards = params.unsupported_fields.get("dynamicforward");
+}
 ```
 
 ---
