@@ -104,130 +104,8 @@
 //!
 //! ## Configuring default algorithms
 //!
-//! When you invoke [`SshConfig::default`], the default algorithms are set from openssh source code, which are the following:
-//!
-//! ```txt
-//! ca_signature_algorithms:
-//!     "ssh-ed25519",
-//!     "ecdsa-sha2-nistp256",
-//!     "ecdsa-sha2-nistp384",
-//!     "ecdsa-sha2-nistp521",
-//!     "sk-ssh-ed25519@openssh.com",
-//!     "sk-ecdsa-sha2-nistp256@openssh.com",
-//!     "rsa-sha2-512",
-//!     "rsa-sha2-256",
-//!
-//! ciphers:
-//!     "chacha20-poly1305@openssh.com",
-//!     "aes128-ctr,aes192-ctr,aes256-ctr",
-//!     "aes128-gcm@openssh.com,aes256-gcm@openssh.com",
-//!
-//! host_key_algorithms:
-//!     "ssh-ed25519-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp256-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp384-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp521-cert-v01@openssh.com",
-//!     "sk-ssh-ed25519-cert-v01@openssh.com",
-//!     "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
-//!     "rsa-sha2-512-cert-v01@openssh.com",
-//!     "rsa-sha2-256-cert-v01@openssh.com",
-//!     "ssh-ed25519",
-//!     "ecdsa-sha2-nistp256",
-//!     "ecdsa-sha2-nistp384",
-//!     "ecdsa-sha2-nistp521",
-//!     "sk-ssh-ed25519@openssh.com",
-//!     "sk-ecdsa-sha2-nistp256@openssh.com",
-//!     "rsa-sha2-512",
-//!     "rsa-sha2-256",
-//!
-//! kex_algorithms:
-//!     "sntrup761x25519-sha512",
-//!     "sntrup761x25519-sha512@openssh.com",
-//!     "mlkem768x25519-sha256",
-//!     "curve25519-sha256",
-//!     "curve25519-sha256@libssh.org",
-//!     "ecdh-sha2-nistp256",
-//!     "ecdh-sha2-nistp384",
-//!     "ecdh-sha2-nistp521",
-//!     "diffie-hellman-group-exchange-sha256",
-//!     "diffie-hellman-group16-sha512",
-//!     "diffie-hellman-group18-sha512",
-//!     "diffie-hellman-group14-sha256",
-//!     "ssh-ed25519-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp256-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp384-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp521-cert-v01@openssh.com",
-//!     "sk-ssh-ed25519-cert-v01@openssh.com",
-//!     "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
-//!     "rsa-sha2-512-cert-v01@openssh.com",
-//!     "rsa-sha2-256-cert-v01@openssh.com",
-//!     "ssh-ed25519",
-//!     "ecdsa-sha2-nistp256",
-//!     "ecdsa-sha2-nistp384",
-//!     "ecdsa-sha2-nistp521",
-//!     "sk-ssh-ed25519@openssh.com",
-//!     "sk-ecdsa-sha2-nistp256@openssh.com",
-//!     "rsa-sha2-512",
-//!     "rsa-sha2-256",
-//!     "chacha20-poly1305@openssh.com",
-//!     "aes128-ctr,aes192-ctr,aes256-ctr",
-//!     "aes128-gcm@openssh.com,aes256-gcm@openssh.com",
-//!     "chacha20-poly1305@openssh.com",
-//!     "aes128-ctr,aes192-ctr,aes256-ctr",
-//!     "aes128-gcm@openssh.com,aes256-gcm@openssh.com",
-//!     "umac-64-etm@openssh.com",
-//!     "umac-128-etm@openssh.com",
-//!     "hmac-sha2-256-etm@openssh.com",
-//!     "hmac-sha2-512-etm@openssh.com",
-//!     "hmac-sha1-etm@openssh.com",
-//!     "umac-64@openssh.com",
-//!     "umac-128@openssh.com",
-//!     "hmac-sha2-256",
-//!     "hmac-sha2-512",
-//!     "hmac-sha1",
-//!     "umac-64-etm@openssh.com",
-//!     "umac-128-etm@openssh.com",
-//!     "hmac-sha2-256-etm@openssh.com",
-//!     "hmac-sha2-512-etm@openssh.com",
-//!     "hmac-sha1-etm@openssh.com",
-//!     "umac-64@openssh.com",
-//!     "umac-128@openssh.com",
-//!     "hmac-sha2-256",
-//!     "hmac-sha2-512",
-//!     "hmac-sha1",
-//!     "none,zlib@openssh.com",
-//!     "none,zlib@openssh.com",
-//!
-//! mac:
-//!     "umac-64-etm@openssh.com",
-//!     "umac-128-etm@openssh.com",
-//!     "hmac-sha2-256-etm@openssh.com",
-//!     "hmac-sha2-512-etm@openssh.com",
-//!     "hmac-sha1-etm@openssh.com",
-//!     "umac-64@openssh.com",
-//!     "umac-128@openssh.com",
-//!     "hmac-sha2-256",
-//!     "hmac-sha2-512",
-//!     "hmac-sha1",
-//!
-//! pubkey_accepted_algorithms:
-//!     "ssh-ed25519-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp256-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp384-cert-v01@openssh.com",
-//!     "ecdsa-sha2-nistp521-cert-v01@openssh.com",
-//!     "sk-ssh-ed25519-cert-v01@openssh.com",
-//!     "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
-//!     "rsa-sha2-512-cert-v01@openssh.com",
-//!     "rsa-sha2-256-cert-v01@openssh.com",
-//!     "ssh-ed25519",
-//!     "ecdsa-sha2-nistp256",
-//!     "ecdsa-sha2-nistp384",
-//!     "ecdsa-sha2-nistp521",
-//!     "sk-ssh-ed25519@openssh.com",
-//!     "sk-ecdsa-sha2-nistp256@openssh.com",
-//!     "rsa-sha2-512",
-//!     "rsa-sha2-256",
-//! ```
+//! When you invoke [`SshConfig::default`], the default algorithms are set from openssh source code,
+//! which can be seen in the [`default_openssh_algorithms`] function documentation.
 //!
 //! If you want you can use a custom constructor [`SshConfig::default_algorithms`] to set your own default algorithms.
 
@@ -249,7 +127,9 @@ mod parser;
 mod serializer;
 
 // -- export
-pub use self::default_algorithms::DefaultAlgorithms;
+pub use self::default_algorithms::{
+    DefaultAlgorithms, default_algorithms as default_openssh_algorithms,
+};
 pub use self::host::{Host, HostClause};
 pub use self::params::{Algorithms, HostParams};
 pub use self::parser::{ParseRule, SshParserError, SshParserResult};

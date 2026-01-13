@@ -23,6 +23,12 @@
 
 ---
 
+## 0.6.4
+
+Released on 13/01/2026
+
+- Auto generate default supported algorithms documentation on build
+
 ## 0.6.3
 
 Released on 13/01/2026

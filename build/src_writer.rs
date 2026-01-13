@@ -24,6 +24,29 @@ pub fn write_source(prefs: MyPrefs) -> anyhow::Result<()> {
     writeln!(file,)?;
 
     writeln!(file, r#"/// Default algorithms for ssh."#)?;
+    writeln!(file, r#"///"#)?;
+    write_algos_in_docs(&mut file, "Ciphers algorithms", &prefs.ciphers)?;
+    write_algos_in_docs(
+        &mut file,
+        "Key Exchange (KEX) algorithms",
+        &prefs.kex_algorithms,
+    )?;
+    write_algos_in_docs(&mut file, "Host Key algorithms", &prefs.host_key_algorithms)?;
+    write_algos_in_docs(
+        &mut file,
+        "Message Authentication Code (MAC) algorithms",
+        &prefs.mac,
+    )?;
+    write_algos_in_docs(
+        &mut file,
+        "CA Signature algorithms",
+        &prefs.ca_signature_algorithms,
+    )?;
+    write_algos_in_docs(
+        &mut file,
+        "Public Key Accepted algorithms",
+        &prefs.pubkey_accepted_algorithms,
+    )?;
     writeln!(file, r#"pub fn defaults() -> DefaultAlgorithms {{"#)?;
     writeln!(file, r#"    DefaultAlgorithms {{"#)?;
     write_vec(
@@ -67,4 +90,20 @@ fn src_path() -> SrcPaths {
     let src_path = src_dir.join("openssh.rs");
 
     SrcPaths { src_dir, src_path }
+}
+
+/// Writes algorithms in documentation format
+fn write_algos_in_docs(
+    file: &mut std::fs::File,
+    group: &str,
+    algos: &[String],
+) -> anyhow::Result<()> {
+    writeln!(file, "/// ## {group}")?;
+    writeln!(file, "///")?;
+    for algo in algos {
+        writeln!(file, "/// - `{algo}`", algo = algo.trim_matches('"'))?;
+    }
+    writeln!(file, "///")?;
+
+    Ok(())
 }

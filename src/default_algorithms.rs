@@ -1,4 +1,5 @@
 mod openssh;
+pub use openssh::defaults as default_algorithms;
 
 /// Default algorithms for ssh.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,7 +14,7 @@ pub struct DefaultAlgorithms {
 
 impl Default for DefaultAlgorithms {
     fn default() -> Self {
-        self::openssh::defaults()
+        default_algorithms()
     }
 }
 
