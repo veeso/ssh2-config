@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::define_parser::parse_defines;
 
-const OPENSSH_TAG: &str = "V_10_0_P2";
+const OPENSSH_TAG: &str = "V_10_2_P1";
 
 /// Default algorithms for ssh.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -34,32 +34,32 @@ pub fn get_my_prefs() -> anyhow::Result<MyPrefs> {
 
     let ca_signature_algorithms = defines
         .get("SSH_ALLOWED_CA_SIGALGS")
-        .map(|s| s.split_whitespace().map(|s| format!(r#""{s}""#)).collect())
+        .map(split_algos)
         .unwrap_or_default();
 
     let ciphers = defines
         .get("KEX_CLIENT_ENCRYPT")
-        .map(|s| s.split_whitespace().map(|s| format!(r#""{s}""#)).collect())
+        .map(split_algos)
         .unwrap_or_default();
 
     let host_key_algorithms = defines
         .get("KEX_DEFAULT_PK_ALG")
-        .map(|s| s.split_whitespace().map(|s| format!(r#""{s}""#)).collect())
+        .map(split_algos)
         .unwrap_or_default();
 
     let kex_algorithms = defines
         .get("KEX_CLIENT")
-        .map(|s| s.split_whitespace().map(|s| format!(r#""{s}""#)).collect())
+        .map(split_algos)
         .unwrap_or_default();
 
     let mac = defines
         .get("KEX_CLIENT_MAC")
-        .map(|s| s.split_whitespace().map(|s| format!(r#""{s}""#)).collect())
+        .map(split_algos)
         .unwrap_or_default();
 
     let pubkey_accepted_algorithms = defines
         .get("KEX_DEFAULT_PK_ALG")
-        .map(|s| s.split_whitespace().map(|s| format!(r#""{s}""#)).collect())
+        .map(split_algos)
         .unwrap_or_default();
 
     Ok(MyPrefs {
@@ -85,4 +85,13 @@ fn clone_openssh(path: &Path) -> anyhow::Result<()> {
     repo.set_head_detached(commit.id())?;
 
     Ok(())
+}
+
+/// Split algorithms string into vector of quoted strings
+fn split_algos(s: impl AsRef<str>) -> Vec<String> {
+    s.as_ref()
+        .replace(',', " ")
+        .split_whitespace()
+        .map(|s| format!(r#""{s}""#))
+        .collect()
 }
