@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+    - [0.6.5](#065)
     - [0.6.4](#064)
     - [0.6.3](#063)
     - [0.6.2](#062)
@@ -24,6 +25,13 @@
     - [0.1.0](#010)
 
 ---
+
+## 0.6.5
+
+Released on 14/01/2026
+
+- [Issue 37](https://github.com/veeso/ssh2-config/issues/37): KEX Algorithms were invalidly extracted
+    - Also removed duplicated and invalid algorithms from the default list.
 
 ## 0.6.4
 

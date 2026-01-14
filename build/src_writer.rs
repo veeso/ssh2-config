@@ -72,24 +72,10 @@ pub fn write_source(prefs: MyPrefs) -> anyhow::Result<()> {
 fn write_vec(file: &mut std::fs::File, name: &str, vec: &[String]) -> anyhow::Result<()> {
     writeln!(file, r#"        {name}: vec!["#)?;
     for item in vec {
-        writeln!(file, r#"            {item}.to_string(),"#,)?;
+        writeln!(file, r#"            "{item}".to_string(),"#,)?;
     }
     writeln!(file, r#"        ],"#)?;
     Ok(())
-}
-
-struct SrcPaths {
-    src_dir: PathBuf,
-    src_path: PathBuf,
-}
-
-fn src_path() -> SrcPaths {
-    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("src")
-        .join("default_algorithms");
-    let src_path = src_dir.join("openssh.rs");
-
-    SrcPaths { src_dir, src_path }
 }
 
 /// Writes algorithms in documentation format
@@ -106,4 +92,18 @@ fn write_algos_in_docs(
     writeln!(file, "///")?;
 
     Ok(())
+}
+
+struct SrcPaths {
+    src_dir: PathBuf,
+    src_path: PathBuf,
+}
+
+fn src_path() -> SrcPaths {
+    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("default_algorithms");
+    let src_path = src_dir.join("openssh.rs");
+
+    SrcPaths { src_dir, src_path }
 }
