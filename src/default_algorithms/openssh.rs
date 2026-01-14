@@ -27,58 +27,6 @@ use crate::DefaultAlgorithms;
 /// - `diffie-hellman-group16-sha512`
 /// - `diffie-hellman-group18-sha512`
 /// - `diffie-hellman-group14-sha256`
-/// - `ssh-ed25519-cert-v01@openssh.com`
-/// - `ecdsa-sha2-nistp256-cert-v01@openssh.com`
-/// - `ecdsa-sha2-nistp384-cert-v01@openssh.com`
-/// - `ecdsa-sha2-nistp521-cert-v01@openssh.com`
-/// - `sk-ssh-ed25519-cert-v01@openssh.com`
-/// - `sk-ecdsa-sha2-nistp256-cert-v01@openssh.com`
-/// - `rsa-sha2-512-cert-v01@openssh.com`
-/// - `rsa-sha2-256-cert-v01@openssh.com`
-/// - `ssh-ed25519`
-/// - `ecdsa-sha2-nistp256`
-/// - `ecdsa-sha2-nistp384`
-/// - `ecdsa-sha2-nistp521`
-/// - `sk-ssh-ed25519@openssh.com`
-/// - `sk-ecdsa-sha2-nistp256@openssh.com`
-/// - `rsa-sha2-512`
-/// - `rsa-sha2-256`
-/// - `chacha20-poly1305@openssh.com`
-/// - `aes128-gcm@openssh.com`
-/// - `aes256-gcm@openssh.com`
-/// - `aes128-ctr`
-/// - `aes192-ctr`
-/// - `aes256-ctr`
-/// - `chacha20-poly1305@openssh.com`
-/// - `aes128-gcm@openssh.com`
-/// - `aes256-gcm@openssh.com`
-/// - `aes128-ctr`
-/// - `aes192-ctr`
-/// - `aes256-ctr`
-/// - `umac-64-etm@openssh.com`
-/// - `umac-128-etm@openssh.com`
-/// - `hmac-sha2-256-etm@openssh.com`
-/// - `hmac-sha2-512-etm@openssh.com`
-/// - `hmac-sha1-etm@openssh.com`
-/// - `umac-64@openssh.com`
-/// - `umac-128@openssh.com`
-/// - `hmac-sha2-256`
-/// - `hmac-sha2-512`
-/// - `hmac-sha1`
-/// - `umac-64-etm@openssh.com`
-/// - `umac-128-etm@openssh.com`
-/// - `hmac-sha2-256-etm@openssh.com`
-/// - `hmac-sha2-512-etm@openssh.com`
-/// - `hmac-sha1-etm@openssh.com`
-/// - `umac-64@openssh.com`
-/// - `umac-128@openssh.com`
-/// - `hmac-sha2-256`
-/// - `hmac-sha2-512`
-/// - `hmac-sha1`
-/// - `none`
-/// - `zlib@openssh.com`
-/// - `none`
-/// - `zlib@openssh.com`
 ///
 /// ## Host Key algorithms
 ///
@@ -193,58 +141,6 @@ pub fn defaults() -> DefaultAlgorithms {
             "diffie-hellman-group16-sha512".to_string(),
             "diffie-hellman-group18-sha512".to_string(),
             "diffie-hellman-group14-sha256".to_string(),
-            "ssh-ed25519-cert-v01@openssh.com".to_string(),
-            "ecdsa-sha2-nistp256-cert-v01@openssh.com".to_string(),
-            "ecdsa-sha2-nistp384-cert-v01@openssh.com".to_string(),
-            "ecdsa-sha2-nistp521-cert-v01@openssh.com".to_string(),
-            "sk-ssh-ed25519-cert-v01@openssh.com".to_string(),
-            "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com".to_string(),
-            "rsa-sha2-512-cert-v01@openssh.com".to_string(),
-            "rsa-sha2-256-cert-v01@openssh.com".to_string(),
-            "ssh-ed25519".to_string(),
-            "ecdsa-sha2-nistp256".to_string(),
-            "ecdsa-sha2-nistp384".to_string(),
-            "ecdsa-sha2-nistp521".to_string(),
-            "sk-ssh-ed25519@openssh.com".to_string(),
-            "sk-ecdsa-sha2-nistp256@openssh.com".to_string(),
-            "rsa-sha2-512".to_string(),
-            "rsa-sha2-256".to_string(),
-            "chacha20-poly1305@openssh.com".to_string(),
-            "aes128-gcm@openssh.com".to_string(),
-            "aes256-gcm@openssh.com".to_string(),
-            "aes128-ctr".to_string(),
-            "aes192-ctr".to_string(),
-            "aes256-ctr".to_string(),
-            "chacha20-poly1305@openssh.com".to_string(),
-            "aes128-gcm@openssh.com".to_string(),
-            "aes256-gcm@openssh.com".to_string(),
-            "aes128-ctr".to_string(),
-            "aes192-ctr".to_string(),
-            "aes256-ctr".to_string(),
-            "umac-64-etm@openssh.com".to_string(),
-            "umac-128-etm@openssh.com".to_string(),
-            "hmac-sha2-256-etm@openssh.com".to_string(),
-            "hmac-sha2-512-etm@openssh.com".to_string(),
-            "hmac-sha1-etm@openssh.com".to_string(),
-            "umac-64@openssh.com".to_string(),
-            "umac-128@openssh.com".to_string(),
-            "hmac-sha2-256".to_string(),
-            "hmac-sha2-512".to_string(),
-            "hmac-sha1".to_string(),
-            "umac-64-etm@openssh.com".to_string(),
-            "umac-128-etm@openssh.com".to_string(),
-            "hmac-sha2-256-etm@openssh.com".to_string(),
-            "hmac-sha2-512-etm@openssh.com".to_string(),
-            "hmac-sha1-etm@openssh.com".to_string(),
-            "umac-64@openssh.com".to_string(),
-            "umac-128@openssh.com".to_string(),
-            "hmac-sha2-256".to_string(),
-            "hmac-sha2-512".to_string(),
-            "hmac-sha1".to_string(),
-            "none".to_string(),
-            "zlib@openssh.com".to_string(),
-            "none".to_string(),
-            "zlib@openssh.com".to_string(),
         ],
         mac: vec![
             "umac-64-etm@openssh.com".to_string(),

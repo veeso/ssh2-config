@@ -270,7 +270,7 @@ the list.
 To reload algos, build ssh2-config with `RELOAD_SSH_ALGO` env variable set.
 
 When you invoke `SshConfig::default`, the default algorithms are set from OpenSSH source code, which can be found
-here: <https://docs.rs/ssh2-config/latest/ssh2-config/fn.default_openssh_algorithms.html>.
+here: <https://docs.rs/ssh2_config/latest/ssh2_config/fn.default_openssh_algorithms.html>.
 
 If you want you can use a custom constructor `SshConfig::default().default_algorithms(prefs)` to set your own default
 algorithms.
