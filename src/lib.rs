@@ -376,4 +376,98 @@ mod tests {
 
         assert_eq!(config, config_parsed);
     }
+
+    #[test]
+    fn should_get_intersecting_hosts() {
+        test_log();
+
+        let mut config = SshConfig::default();
+        let mut params1 = HostParams::new(&DefaultAlgorithms::default());
+        params1.bind_address = Some("0.0.0.0".to_string());
+        config.hosts.push(Host::new(
+            vec![HostClause::new(String::from("192.168.*.*"), false)],
+            params1,
+        ));
+        let mut params2 = HostParams::new(&DefaultAlgorithms::default());
+        params2.bind_interface = Some(String::from("tun0"));
+        config.hosts.push(Host::new(
+            vec![HostClause::new(String::from("192.168.10.*"), false)],
+            params2,
+        ));
+        let mut params3 = HostParams::new(&DefaultAlgorithms::default());
+        params3.host_name = Some("172.26.104.4".to_string());
+        config.hosts.push(Host::new(
+            vec![HostClause::new(String::from("172.26.*.*"), false)],
+            params3,
+        ));
+
+        // Test intersecting_hosts returns correct hosts
+        let matching: Vec<_> = config.intersecting_hosts("192.168.10.1").collect();
+        assert_eq!(matching.len(), 2);
+
+        let matching: Vec<_> = config.intersecting_hosts("192.168.1.1").collect();
+        assert_eq!(matching.len(), 1);
+
+        let matching: Vec<_> = config.intersecting_hosts("172.26.0.1").collect();
+        assert_eq!(matching.len(), 1);
+
+        // No matches
+        let matching: Vec<_> = config.intersecting_hosts("10.0.0.1").collect();
+        assert_eq!(matching.len(), 0);
+    }
+
+    #[test]
+    fn should_set_default_algorithms() {
+        test_log();
+
+        let custom_algos = DefaultAlgorithms {
+            ca_signature_algorithms: vec!["custom-algo".to_string()],
+            ciphers: vec!["custom-cipher".to_string()],
+            host_key_algorithms: vec!["custom-hostkey".to_string()],
+            kex_algorithms: vec!["custom-kex".to_string()],
+            mac: vec!["custom-mac".to_string()],
+            pubkey_accepted_algorithms: vec!["custom-pubkey".to_string()],
+        };
+
+        let config = SshConfig::default().default_algorithms(custom_algos.clone());
+
+        assert_eq!(config.default_algorithms, custom_algos);
+    }
+
+    #[test]
+    fn should_create_config_from_hosts() {
+        test_log();
+
+        let mut params = HostParams::new(&DefaultAlgorithms::default());
+        params.host_name = Some("example.com".to_string());
+        let host = Host::new(
+            vec![HostClause::new(String::from("example"), false)],
+            params,
+        );
+
+        let config = SshConfig::from_hosts(vec![host.clone()]);
+        assert_eq!(config.get_hosts().len(), 1);
+        assert_eq!(config.get_hosts()[0], host);
+    }
+
+    #[test]
+    fn should_query_empty_config() {
+        test_log();
+
+        let config = SshConfig::default();
+        let params = config.query("any-host");
+
+        // Should return default params
+        assert!(params.host_name.is_none());
+        assert!(params.port.is_none());
+    }
+
+    #[test]
+    fn should_display_empty_config() {
+        test_log();
+
+        let config = SshConfig::default();
+        let output = config.to_string();
+        assert!(output.is_empty());
+    }
 }

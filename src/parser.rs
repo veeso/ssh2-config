@@ -1684,6 +1684,196 @@ mod tests {
         assert_eq!(PathBuf::from(resolved), expected);
     }
 
+    #[test]
+    fn should_fail_parsing_algos_missing_arg() {
+        crate::test_log();
+        assert!(matches!(
+            SshConfigParser::parse_algos(vec![]).unwrap_err(),
+            SshParserError::MissingArgument
+        ));
+    }
+
+    #[test]
+    fn should_parse_duration_zero() {
+        crate::test_log();
+        assert_eq!(
+            SshConfigParser::parse_duration(vec![String::from("0")]).unwrap(),
+            Duration::from_secs(0)
+        );
+    }
+
+    #[test]
+    fn should_parse_port_boundary() {
+        crate::test_log();
+        // Minimum valid port
+        assert_eq!(
+            SshConfigParser::parse_port(vec![String::from("1")]).unwrap(),
+            1
+        );
+        // Maximum valid port
+        assert_eq!(
+            SshConfigParser::parse_port(vec![String::from("65535")]).unwrap(),
+            65535
+        );
+    }
+
+    #[test]
+    fn should_update_host_add_keys_to_agent() {
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
+        SshConfigParser::update_host(
+            Field::AddKeysToAgent,
+            vec![String::from("yes")],
+            &mut host,
+            ParseRule::STRICT,
+            &DefaultAlgorithms::empty(),
+        )
+        .unwrap();
+        assert_eq!(host.params.add_keys_to_agent.unwrap(), true);
+
+        let mut host2 = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
+        SshConfigParser::update_host(
+            Field::AddKeysToAgent,
+            vec![String::from("no")],
+            &mut host2,
+            ParseRule::STRICT,
+            &DefaultAlgorithms::empty(),
+        )
+        .unwrap();
+        assert_eq!(host2.params.add_keys_to_agent.unwrap(), false);
+    }
+
+    #[test]
+    fn should_update_host_forward_agent() {
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
+        SshConfigParser::update_host(
+            Field::ForwardAgent,
+            vec![String::from("yes")],
+            &mut host,
+            ParseRule::STRICT,
+            &DefaultAlgorithms::empty(),
+        )
+        .unwrap();
+        assert_eq!(host.params.forward_agent.unwrap(), true);
+    }
+
+    #[test]
+    fn should_update_host_proxy_jump() {
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
+        SshConfigParser::update_host(
+            Field::ProxyJump,
+            vec![String::from("jump1,jump2,jump3")],
+            &mut host,
+            ParseRule::STRICT,
+            &DefaultAlgorithms::empty(),
+        )
+        .unwrap();
+        assert_eq!(
+            host.params.proxy_jump.unwrap(),
+            vec![
+                "jump1".to_string(),
+                "jump2".to_string(),
+                "jump3".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn should_update_host_identity_file() {
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
+        SshConfigParser::update_host(
+            Field::IdentityFile,
+            vec![String::from("/path/to/key1"), String::from("/path/to/key2")],
+            &mut host,
+            ParseRule::STRICT,
+            &DefaultAlgorithms::empty(),
+        )
+        .unwrap();
+        assert_eq!(
+            host.params.identity_file.unwrap(),
+            vec![
+                PathBuf::from("/path/to/key1"),
+                PathBuf::from("/path/to/key2")
+            ]
+        );
+    }
+
+    #[test]
+    fn should_store_unsupported_fields_when_allowed() {
+        crate::test_log();
+
+        let config = r##"
+Host test
+    PasswordAuthentication yes
+"##;
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS)
+            .unwrap();
+
+        let params = config.query("test");
+        assert!(
+            params
+                .unsupported_fields
+                .contains_key("passwordauthentication")
+        );
+    }
+
+    #[test]
+    fn should_tokenize_line_with_equals_separator() {
+        crate::test_log();
+        let (field, args) = SshConfigParser::tokenize_line("HostName=example.com").unwrap();
+        assert_eq!(field, Field::HostName);
+        assert_eq!(args, vec!["example.com".to_string()]);
+    }
+
+    #[test]
+    fn should_tokenize_line_with_quoted_args() {
+        crate::test_log();
+        let (field, args) =
+            SshConfigParser::tokenize_line("Ciphers \"aes256-ctr,aes128-ctr\"").unwrap();
+        assert_eq!(field, Field::Ciphers);
+        assert_eq!(args, vec!["aes256-ctr,aes128-ctr".to_string()]);
+    }
+
+    #[test]
+    fn should_tokenize_line_with_equals_and_quoted_args() {
+        crate::test_log();
+        let (field, args) =
+            SshConfigParser::tokenize_line("Ciphers=\"aes256-ctr,aes128-ctr\"").unwrap();
+        assert_eq!(field, Field::Ciphers);
+        assert_eq!(args, vec!["aes256-ctr,aes128-ctr".to_string()]);
+    }
+
+    #[test]
+    fn should_parse_host_with_single_pattern() {
+        crate::test_log();
+        let result = SshConfigParser::parse_host(vec![String::from("example.com")]).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].pattern, "example.com");
+        assert!(!result[0].negated);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn should_update_host_use_keychain() {
+        crate::test_log();
+        let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
+        SshConfigParser::update_host(
+            Field::UseKeychain,
+            vec![String::from("yes")],
+            &mut host,
+            ParseRule::STRICT,
+            &DefaultAlgorithms::empty(),
+        )
+        .unwrap();
+        assert_eq!(host.params.use_keychain.unwrap(), true);
+    }
+
     fn create_ssh_config_with_quotes_and_eq() -> NamedTempFile {
         let mut tmpfile: tempfile::NamedTempFile =
             tempfile::NamedTempFile::new().expect("Failed to create tempfile");

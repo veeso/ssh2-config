@@ -283,4 +283,184 @@ mod tests {
         let output = SshConfig::from_hosts(vec![root, host]).to_string();
         assert!(&output.starts_with("ServerAliveInterval 60"));
     }
+
+    #[test]
+    fn serialize_empty_config() {
+        let config = SshConfig::from_hosts(vec![]);
+        let output = config.to_string();
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn serialize_first_host_not_default() {
+        // When first host is not a default "*" pattern, it should be serialized with Host directive
+        let mut host_params = HostParams::new(&DefaultAlgorithms::empty());
+        host_params.user = Some("user".to_string());
+        let host = Host::new(
+            vec![HostClause::new(String::from("example.com"), false)],
+            host_params,
+        );
+
+        let output = SshConfig::from_hosts(vec![host]).to_string();
+        assert!(output.starts_with("Host example.com"));
+        assert!(output.contains("User user"));
+    }
+
+    #[test]
+    fn serialize_all_supported_fields() {
+        use std::path::PathBuf;
+
+        let mut params = HostParams::new(&DefaultAlgorithms::empty());
+        params.bind_address = Some("10.0.0.1".to_string());
+        params.add_keys_to_agent = Some(true);
+        params.bind_interface = Some("eth0".to_string());
+        params.certificate_file = Some(PathBuf::from("/path/to/cert"));
+        params.compression = Some(true);
+        params.connection_attempts = Some(3);
+        params.connect_timeout = Some(Duration::from_secs(30));
+        params.forward_agent = Some(true);
+        params.host_name = Some("real-host.com".to_string());
+        params.identity_file = Some(vec![PathBuf::from("/path/to/id")]);
+        params.ignore_unknown = Some(vec!["Field1".to_string(), "Field2".to_string()]);
+        params.port = Some(22);
+        params.proxy_jump = Some(vec!["jump1".to_string(), "jump2".to_string()]);
+        params.pubkey_authentication = Some(false);
+        params.remote_forward = Some(8080);
+        params.server_alive_interval = Some(Duration::from_secs(60));
+        params.tcp_keep_alive = Some(false);
+        #[cfg(target_os = "macos")]
+        {
+            params.use_keychain = Some(true);
+        }
+        params.user = Some("testuser".to_string());
+        params
+            .ignored_fields
+            .insert("CustomField".to_string(), vec!["value".to_string()]);
+        params
+            .unsupported_fields
+            .insert("UnsupportedField".to_string(), vec!["val".to_string()]);
+
+        let host = Host::new(
+            vec![HostClause::new(String::from("test-host"), false)],
+            params,
+        );
+
+        let output = SshConfig::from_hosts(vec![host]).to_string();
+
+        assert!(output.contains("Host test-host"));
+        assert!(output.contains("Hostname 10.0.0.1"));
+        assert!(output.contains("AddKeysToAgent yes"));
+        assert!(output.contains("BindAddress eth0"));
+        assert!(output.contains("CertificateFile /path/to/cert"));
+        assert!(output.contains("Compression yes"));
+        assert!(output.contains("ConnectionAttempts 3"));
+        assert!(output.contains("ConnectTimeout 30"));
+        assert!(output.contains("ForwardAgent yes"));
+        assert!(output.contains("HostName real-host.com"));
+        assert!(output.contains("IdentityFile /path/to/id"));
+        assert!(output.contains("IgnoreUnknown Field1,Field2"));
+        assert!(output.contains("Port 22"));
+        assert!(output.contains("ProxyJump jump1,jump2"));
+        assert!(output.contains("PubkeyAuthentication no"));
+        assert!(output.contains("RemoteForward 8080"));
+        assert!(output.contains("ServerAliveInterval 60"));
+        assert!(output.contains("TCPKeepAlive no"));
+        #[cfg(target_os = "macos")]
+        assert!(output.contains("UseKeychain yes"));
+        assert!(output.contains("User testuser"));
+        assert!(output.contains("CustomField value"));
+        assert!(output.contains("UnsupportedField val"));
+    }
+
+    #[test]
+    fn serialize_algorithms_with_rules() {
+        use std::io::BufReader;
+
+        use crate::{ParseRule, SshConfig};
+
+        // Parse a config with algorithm rules to test serialization
+        let config_str = r#"
+Host algo-host
+    Ciphers +aes256-ctr
+    HostKeyAlgorithms ^ssh-rsa
+    KexAlgorithms -diffie
+    MACs hmac-sha2-256
+    PubkeyAcceptedAlgorithms +ssh-ed25519
+    CASignatureAlgorithms ecdsa-sha2-nistp256
+"#;
+        let mut reader = BufReader::new(config_str.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)
+            .unwrap();
+
+        let output = config.to_string();
+
+        assert!(output.contains("Ciphers +"));
+        assert!(output.contains("HostKeyAlgorithms ^"));
+        assert!(output.contains("KexAlgorithms -"));
+        assert!(output.contains("MACs"));
+        assert!(output.contains("PubkeyAcceptedAlgorithms +"));
+        assert!(output.contains("CASignatureAlgorithms"));
+    }
+
+    #[test]
+    fn serialize_boolean_fields_as_no() {
+        let mut params = HostParams::new(&DefaultAlgorithms::empty());
+        params.add_keys_to_agent = Some(false);
+        params.compression = Some(false);
+        params.forward_agent = Some(false);
+        params.tcp_keep_alive = Some(false);
+        params.pubkey_authentication = Some(false);
+        #[cfg(target_os = "macos")]
+        {
+            params.use_keychain = Some(false);
+        }
+
+        let host = Host::new(
+            vec![HostClause::new(String::from("bool-host"), false)],
+            params,
+        );
+
+        let output = SshConfig::from_hosts(vec![host]).to_string();
+
+        assert!(output.contains("AddKeysToAgent no"));
+        assert!(output.contains("Compression no"));
+        assert!(output.contains("ForwardAgent no"));
+        assert!(output.contains("TCPKeepAlive no"));
+        assert!(output.contains("PubkeyAuthentication no"));
+        #[cfg(target_os = "macos")]
+        assert!(output.contains("UseKeychain no"));
+    }
+
+    #[test]
+    fn serialize_multiple_hosts() {
+        let mut params1 = HostParams::new(&DefaultAlgorithms::empty());
+        params1.user = Some("user1".to_string());
+        let host1 = Host::new(vec![HostClause::new(String::from("host1"), false)], params1);
+
+        let mut params2 = HostParams::new(&DefaultAlgorithms::empty());
+        params2.user = Some("user2".to_string());
+        let host2 = Host::new(vec![HostClause::new(String::from("host2"), false)], params2);
+
+        let output = SshConfig::from_hosts(vec![host1, host2]).to_string();
+
+        assert!(output.contains("Host host1"));
+        assert!(output.contains("User user1"));
+        assert!(output.contains("Host host2"));
+        assert!(output.contains("User user2"));
+    }
+
+    #[test]
+    fn serialize_with_empty_params() {
+        let params = HostParams::new(&DefaultAlgorithms::empty());
+        let host = Host::new(
+            vec![HostClause::new(String::from("empty-host"), false)],
+            params,
+        );
+
+        let output = SshConfig::from_hosts(vec![host]).to_string();
+        // Should only contain Host directive and newline
+        assert!(output.starts_with("Host empty-host"));
+    }
 }
