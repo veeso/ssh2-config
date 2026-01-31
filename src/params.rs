@@ -12,7 +12,7 @@ use super::{Duration, PathBuf};
 use crate::DefaultAlgorithms;
 
 /// Describes the ssh configuration.
-/// Configuration is describes in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
+/// Configuration is described in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
 /// Only arguments supported by libssh2 are implemented
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostParams {
@@ -52,7 +52,7 @@ pub struct HostParams {
     pub mac: Algorithms,
     /// Specifies the port number to connect on the remote host.
     pub port: Option<u16>,
-    /// Specifies one or more jump proxies as either [user@]host[:port] or an ssh URI
+    /// Specifies one or more jump proxies as either \[user@\]host\[:port\] or an ssh URI
     pub proxy_jump: Option<Vec<String>>,
     /// Specifies the signature algorithms that will be used for public key authentication
     pub pubkey_accepted_algorithms: Algorithms,

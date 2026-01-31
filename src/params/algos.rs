@@ -101,7 +101,7 @@ impl Algorithms {
         &self.algos
     }
 
-    /// Apply an [`AlgorithmsRule`] to the [`Algorithms`] instance.
+    /// Apply an `AlgorithmsRule` to the [`Algorithms`] instance.
     ///
     /// If defaults haven't been overridden, apply changes from incoming rule;
     /// otherwise keep as-is.
