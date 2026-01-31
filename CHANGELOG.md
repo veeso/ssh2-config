@@ -40,6 +40,8 @@ Released on 31/01/2026
   of silently ignoring them.
 - [Issue 44](https://github.com/veeso/ssh2-config/issues/44): Parser now handles escape sequences (`\"`, `\\`, `\'`)
   within quoted arguments.
+- [Issue 46](https://github.com/veeso/ssh2-config/issues/46): Fixed pattern parsing to handle multiple `!` characters
+  correctly. Only a leading `!` indicates negation; subsequent `!` characters are treated as literal.
 
 ## 0.6.5
 
