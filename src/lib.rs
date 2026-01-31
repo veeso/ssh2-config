@@ -4,17 +4,21 @@
 //! # ssh2-config
 //!
 //! ssh2-config a library which provides a parser for the SSH configuration file,
-//! to be used in pair with the [ssh2](https://github.com/alexcrichton/ssh2-rs) crate.
+//! to be used in pair with the [ssh2](https://github.com/alexcrichton/ssh2-rs) crate, or
+//! in general with any other OpenSSH compatible SSH client implementation.
 //!
 //! This library provides a method to parse the configuration file and returns the
 //! configuration parsed into a structure.
-//! The `SshConfig` structure provides all the attributes which **can** be used to configure the **ssh2 Session**
+//! The [`SshConfig`] structure provides all the attributes which **can** be used to configure the **ssh2 Session**
 //! and to resolve the host, port and username.
 //!
-//! Once the configuration has been parsed you can use the `query(&str)`
+//! Once the configuration has been parsed you can use the [`SshConfig::query`]
 //! method to query configuration for a certain host, based on the configured patterns.
 //! Even if many attributes are not exposed, since not supported, there is anyway a validation of the configuration,
 //! so invalid configuration will result in a parsing error.
+//!
+//! The reference used for the configuration file and how parameters are resolved is the OpenSSH one,
+//! is described at <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>.
 //!
 //! ## Get started
 //!

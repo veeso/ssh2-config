@@ -1,10 +1,9 @@
 # SSH_CONFIG(5) - OpenSSH Client Configuration File
 
-Source: <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
-
 ## Overview
 
-The `ssh_config` file is the OpenSSH client configuration file that allows users to configure SSH connection behavior through various keywords and parameters.
+The `ssh_config` file is the OpenSSH client configuration file that allows users to configure SSH connection behavior
+through various keywords and parameters.
 
 ## Configuration Priority
 
@@ -26,9 +25,11 @@ SSH obtains configuration data in the following order (first value wins):
 
 ### Host and Match
 
-**Host**: Restricts declarations to hosts matching specified patterns. Supports wildcards (*) and negation (!). A single * provides global defaults.
+**Host**: Restricts declarations to hosts matching specified patterns. Supports wildcards (*) and negation (!). A
+single * provides global defaults.
 
-**Match**: Restricts declarations based on conditions like `canonical`, `final`, `exec`, `localnetwork`, `host`, `originalhost`, `tagged`, `command`, `user`, `localuser`, `version`, and `sessiontype`.
+**Match**: Restricts declarations based on conditions like `canonical`, `final`, `exec`, `localnetwork`, `host`,
+`originalhost`, `tagged`, `command`, `user`, `localuser`, `version`, and `sessiontype`.
 
 ## Authentication Options
 
@@ -38,7 +39,8 @@ Automatically add keys to `ssh-agent`. Options: `yes`, `ask`, `confirm`, `no`, o
 
 ### IdentityFile
 
-Specifies authentication identity files. Supports ECDSA, Ed25519, and RSA keys. Default: ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ed25519, and security key variants.
+Specifies authentication identity files. Supports ECDSA, Ed25519, and RSA keys. Default: ~/.ssh/id_rsa, ~
+/.ssh/id_ecdsa, ~/.ssh/id_ed25519, and security key variants.
 
 ### IdentitiesOnly
 
@@ -127,7 +129,8 @@ Disable host authentication for localhost. Default: `no`.
 
 ### Ciphers
 
-Allowed ciphers and preference order. Supports modifiers (+, -, ^). Default includes chacha20-poly1305, AES-GCM variants, and AES-CTR.
+Allowed ciphers and preference order. Supports modifiers (+, -, ^). Default includes chacha20-poly1305, AES-GCM
+variants, and AES-CTR.
 
 ### MACs
 
@@ -135,7 +138,8 @@ Message authentication code algorithms in preference order. Default prioritizes 
 
 ### KexAlgorithms
 
-Key exchange algorithms. Default includes post-quantum variants (mlkem768x25519, sntrup761x25519), elliptic curve, and Diffie-Hellman options.
+Key exchange algorithms. Default includes post-quantum variants (mlkem768x25519, sntrup761x25519), elliptic curve, and
+Diffie-Hellman options.
 
 ### PubkeyAcceptedAlgorithms
 
@@ -215,7 +219,8 @@ Session type: `none` (no remote command), `subsystem`, or `default`.
 
 ### LocalForward
 
-Forward TCP port or Unix-domain socket from local machine over secure channel. Syntax: [bind_address:]port or Unix socket path.
+Forward TCP port or Unix-domain socket from local machine over secure channel. Syntax: [bind_address:]port or Unix
+socket path.
 
 ### RemoteForward
 
@@ -465,15 +470,10 @@ Patterns support:
 - `?`: Wildcard matching exactly one character
 - `!`: Negation prefix
 
-Pattern-lists use comma separation and support negation. Negated matches don't produce positive results alone; include a positive term like `*`.
+Pattern-lists use comma separation and support negation. Negated matches don't produce positive results alone; include a
+positive term like `*`.
 
 ## Files
 
 - **~/.ssh/config**: Per-user configuration file (requires strict permissions: read/write for user only)
 - **/etc/ssh/ssh_config**: System-wide configuration file (must be world-readable)
-
----
-
-**See Also**: ssh(1)
-
-**Authors**: OpenSSH contributors based on original ssh 1.2.12 by Tatu Ylonen
