@@ -172,13 +172,28 @@ impl SshConfigParser {
         Ok(())
     }
 
-    /// Strip comments from line
+    /// Strip comments from line (quote-aware)
     fn strip_comments(s: &str) -> String {
-        if let Some(pos) = s.find('#') {
-            s[..pos].to_string()
-        } else {
-            s.to_string()
+        let mut in_quotes = false;
+        let mut result = String::new();
+
+        for c in s.chars() {
+            match c {
+                '"' => {
+                    in_quotes = !in_quotes;
+                    result.push(c);
+                }
+                '#' if !in_quotes => {
+                    // Found a comment outside quotes, stop here
+                    break;
+                }
+                _ => {
+                    result.push(c);
+                }
+            }
         }
+
+        result
     }
 
     /// Update current given host with field argument
@@ -1603,6 +1618,33 @@ mod tests {
         assert_eq!(
             SshConfigParser::strip_comments("# this is a comment").as_str(),
             ""
+        );
+    }
+
+    #[test]
+    fn should_preserve_hash_inside_quoted_strings() {
+        crate::test_log();
+
+        // Hash inside quotes should NOT be treated as a comment
+        assert_eq!(
+            SshConfigParser::strip_comments(r#"Ciphers "aes256-ctr # not a comment""#).as_str(),
+            r#"Ciphers "aes256-ctr # not a comment""#
+        );
+        // Hash after closing quote should be treated as a comment
+        assert_eq!(
+            SshConfigParser::strip_comments(r#"Ciphers "aes256-ctr" # this is a comment"#).as_str(),
+            r#"Ciphers "aes256-ctr" "#
+        );
+        // Multiple quoted sections
+        assert_eq!(
+            SshConfigParser::strip_comments(r#"ProxyCommand "ssh # hop" -W "dest # host""#)
+                .as_str(),
+            r#"ProxyCommand "ssh # hop" -W "dest # host""#
+        );
+        // Comment after multiple quoted sections
+        assert_eq!(
+            SshConfigParser::strip_comments(r#"Key "val1" "val2" # comment"#).as_str(),
+            r#"Key "val1" "val2" "#
         );
     }
 
