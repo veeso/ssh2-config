@@ -135,4 +135,82 @@ mod tests {
         assert_eq!(host.intersects("10.9.0.8"), false);
         assert_eq!(host.intersects("10.8.0.8"), false);
     }
+
+    #[test]
+    fn should_display_host_clause() {
+        let clause = HostClause::new("192.168.*.*".to_string(), false);
+        assert_eq!(clause.to_string(), "192.168.*.*");
+
+        let negated_clause = HostClause::new("192.168.1.1".to_string(), true);
+        assert_eq!(negated_clause.to_string(), "!192.168.1.1");
+    }
+
+    #[test]
+    fn should_not_intersect_with_empty_pattern() {
+        let host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::default()));
+        assert_eq!(host.intersects("any-host"), false);
+    }
+
+    #[test]
+    fn should_intersect_with_single_char_wildcard() {
+        let clause = HostClause::new("server?".to_string(), false);
+        assert!(clause.intersects("server1"));
+        assert!(clause.intersects("serverA"));
+        assert!(!clause.intersects("server12"));
+        assert!(!clause.intersects("server"));
+    }
+
+    #[test]
+    fn should_intersect_with_only_negated_clauses_after_positive() {
+        // A host with positive and negated clauses where negated comes last
+        let host = Host::new(
+            vec![
+                HostClause::new("*.example.com".to_string(), false),
+                HostClause::new("secret.example.com".to_string(), true),
+            ],
+            HostParams::new(&DefaultAlgorithms::default()),
+        );
+        assert!(host.intersects("www.example.com"));
+        assert!(!host.intersects("secret.example.com"));
+        assert!(!host.intersects("other.net"));
+    }
+
+    #[test]
+    fn should_handle_wildcard_at_start() {
+        let clause = HostClause::new("*-server".to_string(), false);
+        assert!(clause.intersects("prod-server"));
+        assert!(clause.intersects("dev-server"));
+        assert!(!clause.intersects("server-prod"));
+    }
+
+    #[test]
+    fn should_handle_wildcard_at_end() {
+        let clause = HostClause::new("server-*".to_string(), false);
+        assert!(clause.intersects("server-prod"));
+        assert!(clause.intersects("server-dev"));
+        assert!(!clause.intersects("prod-server"));
+    }
+
+    #[test]
+    fn should_match_exact_pattern() {
+        let clause = HostClause::new("exact-host".to_string(), false);
+        assert!(clause.intersects("exact-host"));
+        assert!(!clause.intersects("exact-host-extra"));
+        assert!(!clause.intersects("prefix-exact-host"));
+    }
+
+    #[test]
+    fn should_match_universal_wildcard() {
+        let clause = HostClause::new("*".to_string(), false);
+        assert!(clause.intersects("any-host"));
+        assert!(clause.intersects("192.168.1.1"));
+        assert!(clause.intersects(""));
+    }
+
+    #[test]
+    fn should_intersect_negated_clause_returns_true_for_matching_negated() {
+        // Test that a negated clause still "intersects" (matches the pattern)
+        let clause = HostClause::new("192.168.*.*".to_string(), true);
+        assert!(clause.intersects("192.168.1.1")); // intersects returns true for pattern match
+    }
 }

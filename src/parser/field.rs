@@ -679,4 +679,187 @@ mod tests {
     fn should_fail_parsing_field() {
         assert!(Field::from_str("CristinaDavena").is_err());
     }
+
+    #[test]
+    fn should_display_field() {
+        // Test Display implementation for supported fields
+        assert_eq!(Field::Host.to_string(), "host");
+        assert_eq!(Field::AddKeysToAgent.to_string(), "addkeystoagent");
+        assert_eq!(Field::BindAddress.to_string(), "bindaddress");
+        assert_eq!(Field::BindInterface.to_string(), "bindinterface");
+        assert_eq!(
+            Field::CaSignatureAlgorithms.to_string(),
+            "casignaturealgorithms"
+        );
+        assert_eq!(Field::CertificateFile.to_string(), "certificatefile");
+        assert_eq!(Field::Ciphers.to_string(), "ciphers");
+        assert_eq!(Field::Compression.to_string(), "compression");
+        assert_eq!(Field::ConnectionAttempts.to_string(), "connectionattempts");
+        assert_eq!(Field::ConnectTimeout.to_string(), "connecttimeout");
+        assert_eq!(Field::ForwardAgent.to_string(), "forwardagent");
+        assert_eq!(Field::HostKeyAlgorithms.to_string(), "hostkeyalgorithms");
+        assert_eq!(Field::HostName.to_string(), "hostname");
+        assert_eq!(Field::IdentityFile.to_string(), "identityfile");
+        assert_eq!(Field::IgnoreUnknown.to_string(), "ignoreunknown");
+        assert_eq!(Field::KexAlgorithms.to_string(), "kexalgorithms");
+        assert_eq!(Field::Mac.to_string(), "macs");
+        assert_eq!(Field::Port.to_string(), "port");
+        assert_eq!(Field::ProxyJump.to_string(), "proxyjump");
+        assert_eq!(
+            Field::PubkeyAcceptedAlgorithms.to_string(),
+            "pubkeyacceptedalgorithms"
+        );
+        assert_eq!(
+            Field::PubkeyAuthentication.to_string(),
+            "pubkeyauthentication"
+        );
+        assert_eq!(Field::RemoteForward.to_string(), "remoteforward");
+        assert_eq!(
+            Field::ServerAliveInterval.to_string(),
+            "serveraliveinterval"
+        );
+        assert_eq!(Field::TcpKeepAlive.to_string(), "tcpkeepalive");
+        #[cfg(target_os = "macos")]
+        assert_eq!(Field::UseKeychain.to_string(), "usekeychain");
+        assert_eq!(Field::User.to_string(), "user");
+
+        // Test Display implementation for unsupported fields
+        assert_eq!(Field::AddressFamily.to_string(), "addressfamily");
+        assert_eq!(Field::BatchMode.to_string(), "batchmode");
+        assert_eq!(Field::CanonicalDomains.to_string(), "canonicaldomains");
+        assert_eq!(
+            Field::CanonicalizeFallbackLock.to_string(),
+            "canonicalizefallbacklock"
+        );
+        assert_eq!(
+            Field::CanonicalizeHostname.to_string(),
+            "canonicalizehostname"
+        );
+        assert_eq!(
+            Field::CanonicalizeMaxDots.to_string(),
+            "canonicalizemaxdots"
+        );
+        assert_eq!(
+            Field::CanonicalizePermittedCNAMEs.to_string(),
+            "canonicalizepermittedcnames"
+        );
+        assert_eq!(Field::CheckHostIP.to_string(), "checkhostip");
+        assert_eq!(
+            Field::ClearAllForwardings.to_string(),
+            "clearallforwardings"
+        );
+        assert_eq!(Field::ControlMaster.to_string(), "controlmaster");
+        assert_eq!(Field::ControlPath.to_string(), "controlpath");
+        assert_eq!(Field::ControlPersist.to_string(), "controlpersist");
+        assert_eq!(Field::DynamicForward.to_string(), "dynamicforward");
+        assert_eq!(Field::EnableSSHKeysign.to_string(), "enablesshkeysign");
+        assert_eq!(Field::EscapeChar.to_string(), "escapechar");
+        assert_eq!(
+            Field::ExitOnForwardFailure.to_string(),
+            "exitonforwardfailure"
+        );
+        assert_eq!(Field::FingerprintHash.to_string(), "fingerprinthash");
+        assert_eq!(
+            Field::ForkAfterAuthentication.to_string(),
+            "forkafterauthentication"
+        );
+        assert_eq!(Field::ForwardX11.to_string(), "forwardx11");
+        assert_eq!(Field::ForwardX11Timeout.to_string(), "forwardx11timeout");
+        assert_eq!(Field::ForwardX11Trusted.to_string(), "forwardx11trusted");
+        assert_eq!(Field::GatewayPorts.to_string(), "gatewayports");
+        assert_eq!(
+            Field::GlobalKnownHostsFile.to_string(),
+            "globalknownhostsfile"
+        );
+        assert_eq!(
+            Field::GSSAPIAuthentication.to_string(),
+            "gssapiauthentication"
+        );
+        assert_eq!(
+            Field::GSSAPIDelegateCredentials.to_string(),
+            "gssapidelegatecredentials"
+        );
+        assert_eq!(Field::HashKnownHosts.to_string(), "hashknownhosts");
+        assert_eq!(
+            Field::HostbasedAcceptedAlgorithms.to_string(),
+            "hostbasedacceptedalgorithms"
+        );
+        assert_eq!(
+            Field::HostbasedAuthentication.to_string(),
+            "hostbasedauthentication"
+        );
+        assert_eq!(Field::HostKeyAlias.to_string(), "hostkeyalias");
+        assert_eq!(Field::HostbasedKeyTypes.to_string(), "hostbasedkeytypes");
+        assert_eq!(Field::IdentitiesOnly.to_string(), "identitiesonly");
+        assert_eq!(Field::IdentityAgent.to_string(), "identityagent");
+        assert_eq!(Field::Include.to_string(), "include");
+        assert_eq!(Field::IPQoS.to_string(), "ipqos");
+        assert_eq!(
+            Field::KbdInteractiveAuthentication.to_string(),
+            "kbdinteractiveauthentication"
+        );
+        assert_eq!(
+            Field::KbdInteractiveDevices.to_string(),
+            "kbdinteractivedevices"
+        );
+        assert_eq!(Field::KnownHostsCommand.to_string(), "knownhostscommand");
+        assert_eq!(Field::LocalCommand.to_string(), "localcommand");
+        assert_eq!(Field::LocalForward.to_string(), "localforward");
+        assert_eq!(Field::LogLevel.to_string(), "loglevel");
+        assert_eq!(Field::LogVerbose.to_string(), "logverbose");
+        assert_eq!(
+            Field::NoHostAuthenticationForLocalhost.to_string(),
+            "nohostauthenticationforlocalhost"
+        );
+        assert_eq!(
+            Field::NumberOfPasswordPrompts.to_string(),
+            "numberofpasswordprompts"
+        );
+        assert_eq!(
+            Field::PasswordAuthentication.to_string(),
+            "passwordauthentication"
+        );
+        assert_eq!(Field::PermitLocalCommand.to_string(), "permitlocalcommand");
+        assert_eq!(Field::PermitRemoteOpen.to_string(), "permitremoteopen");
+        assert_eq!(Field::PKCS11Provider.to_string(), "pkcs11provider");
+        assert_eq!(
+            Field::PreferredAuthentications.to_string(),
+            "preferredauthentications"
+        );
+        assert_eq!(Field::ProxyCommand.to_string(), "proxycommand");
+        assert_eq!(Field::ProxyUseFdpass.to_string(), "proxyusefdpass");
+        assert_eq!(
+            Field::PubkeyAcceptedKeyTypes.to_string(),
+            "pubkeyacceptedkeytypes"
+        );
+        assert_eq!(Field::RekeyLimit.to_string(), "rekeylimit");
+        assert_eq!(Field::RequestTTY.to_string(), "requesttty");
+        assert_eq!(Field::RevokedHostKeys.to_string(), "revokedhostkeys");
+        assert_eq!(
+            Field::SecruityKeyProvider.to_string(),
+            "secruitykeyprovider"
+        );
+        assert_eq!(Field::SendEnv.to_string(), "sendenv");
+        assert_eq!(
+            Field::ServerAliveCountMax.to_string(),
+            "serveralivecountmax"
+        );
+        assert_eq!(Field::SessionType.to_string(), "sessiontype");
+        assert_eq!(Field::SetEnv.to_string(), "setenv");
+        assert_eq!(Field::StdinNull.to_string(), "stdinnull");
+        assert_eq!(
+            Field::StreamLocalBindMask.to_string(),
+            "streamlocalbindmask"
+        );
+        assert_eq!(
+            Field::StrictHostKeyChecking.to_string(),
+            "stricthostkeychecking"
+        );
+        assert_eq!(Field::SyslogFacility.to_string(), "syslogfacility");
+        assert_eq!(Field::UpdateHostKeys.to_string(), "updatehostkeys");
+        assert_eq!(Field::UserKnownHostsFile.to_string(), "userknownhostsfile");
+        assert_eq!(Field::VerifyHostKeyDNS.to_string(), "verifyhostkeydns");
+        assert_eq!(Field::VisualHostKey.to_string(), "visualhostkey");
+        assert_eq!(Field::XAuthLocation.to_string(), "xauthlocation");
+    }
 }

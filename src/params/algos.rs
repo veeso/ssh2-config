@@ -363,4 +363,103 @@ mod tests {
         assert_eq!(algo1.algorithms(), vec!["aes256-ctr".to_string()]);
         assert_eq!(algo1.overridden, true);
     }
+
+    #[test]
+    fn test_algorithms_display_with_rule() {
+        let mut algos = Algorithms::new(&["aes128-ctr"]);
+
+        // Apply append rule
+        let rule = AlgorithmsRule::from_str("+aes256-ctr").expect("failed to parse");
+        algos.apply(rule);
+
+        // Display should show the rule prefix
+        let display = algos.to_string();
+        assert_eq!(display, "+");
+    }
+
+    #[test]
+    fn test_algorithms_display_without_rule() {
+        let algos = Algorithms::new(&["aes128-ctr", "aes256-ctr"]);
+        let display = algos.to_string();
+        assert_eq!(display, "aes128-ctr,aes256-ctr");
+    }
+
+    #[test]
+    fn test_algorithms_rule_display() {
+        let append = AlgorithmsRule::from_str("+algo").expect("failed to parse");
+        assert_eq!(append.to_string(), "+");
+
+        let head = AlgorithmsRule::from_str("^algo").expect("failed to parse");
+        assert_eq!(head.to_string(), "^");
+
+        let exclude = AlgorithmsRule::from_str("-algo").expect("failed to parse");
+        assert_eq!(exclude.to_string(), "-");
+
+        let set = AlgorithmsRule::from_str("algo").expect("failed to parse");
+        assert_eq!(set.to_string(), "");
+    }
+
+    #[test]
+    fn test_algorithms_is_default() {
+        let algos = Algorithms::new(&["aes128-ctr"]);
+        assert!(algos.is_default());
+
+        let mut algos2 = Algorithms::new(&["aes128-ctr"]);
+        algos2.apply(AlgorithmsRule::from_str("aes256-ctr").expect("failed to parse"));
+        assert!(!algos2.is_default());
+    }
+
+    #[test]
+    fn test_parse_empty_algos_returns_error() {
+        let result = AlgorithmsRule::from_str("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_append_with_duplicate_algorithms() {
+        let mut algos = Algorithms::new(&["aes128-ctr", "aes256-ctr"]);
+        let rule = AlgorithmsRule::from_str("+aes128-ctr,aes512-ctr").expect("failed to parse");
+        algos.apply(rule);
+        // aes128-ctr should not be duplicated
+        assert_eq!(
+            algos.algorithms(),
+            vec![
+                "aes128-ctr".to_string(),
+                "aes256-ctr".to_string(),
+                "aes512-ctr".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_exclude_all_algorithms() {
+        let mut algos = Algorithms::new(&["aes128-ctr", "aes256-ctr"]);
+        let rule = AlgorithmsRule::from_str("-aes128-ctr,aes256-ctr").expect("failed to parse");
+        algos.apply(rule);
+        assert!(algos.algorithms().is_empty());
+    }
+
+    #[test]
+    fn test_head_with_empty_defaults() {
+        let empty: Vec<String> = vec![];
+        let mut algos = Algorithms::new(empty);
+        let rule = AlgorithmsRule::from_str("^aes256-ctr").expect("failed to parse");
+        algos.apply(rule);
+        assert_eq!(algos.algorithms(), vec!["aes256-ctr".to_string()]);
+    }
+
+    #[test]
+    fn test_algorithms_rule_op() {
+        let append = AlgorithmsRule::Append(vec!["algo".to_string()]);
+        assert_eq!(append.op(), AlgorithmsOp::Append);
+
+        let head = AlgorithmsRule::Head(vec!["algo".to_string()]);
+        assert_eq!(head.op(), AlgorithmsOp::Head);
+
+        let exclude = AlgorithmsRule::Exclude(vec!["algo".to_string()]);
+        assert_eq!(exclude.op(), AlgorithmsOp::Exclude);
+
+        let set = AlgorithmsRule::Set(vec!["algo".to_string()]);
+        assert_eq!(set.op(), AlgorithmsOp::Set);
+    }
 }
