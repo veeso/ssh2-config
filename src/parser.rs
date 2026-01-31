@@ -663,7 +663,9 @@ impl SshConfigParser {
         Ok(Duration::from_secs(value as u64))
     }
 
-    /// Parse host argument
+    /// Parse host argument.
+    /// A leading `!` indicates a negated pattern. Any `!` characters after the first position
+    /// are treated as literal characters in the pattern.
     fn parse_host(args: Vec<String>) -> SshParserResult<Vec<HostClause>> {
         if args.is_empty() {
             return Err(SshParserError::MissingArgument);
@@ -672,11 +674,10 @@ impl SshConfigParser {
         Ok(args
             .into_iter()
             .map(|x| {
-                let tokens: Vec<&str> = x.split('!').collect();
-                if tokens.len() == 2 {
-                    HostClause::new(tokens[1].to_string(), true)
+                if let Some(pattern) = x.strip_prefix('!') {
+                    HostClause::new(pattern.to_string(), true)
                 } else {
-                    HostClause::new(tokens[0].to_string(), false)
+                    HostClause::new(x, false)
                 }
             })
             .collect())
@@ -2184,6 +2185,35 @@ Host test
         let result = SshConfigParser::parse_host(vec![String::from("example.com")]).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].pattern, "example.com");
+        assert!(!result[0].negated);
+    }
+
+    #[test]
+    fn should_parse_host_with_exclamation_in_pattern() {
+        crate::test_log();
+
+        // Pattern with ! in the middle should be treated as literal (non-negated)
+        let result = SshConfigParser::parse_host(vec![String::from("host!name")]).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].pattern, "host!name");
+        assert!(!result[0].negated);
+
+        // Negated pattern with ! in the pattern itself
+        let result = SshConfigParser::parse_host(vec![String::from("!host!name")]).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].pattern, "host!name");
+        assert!(result[0].negated);
+
+        // Multiple ! after the negation prefix should be preserved
+        let result = SshConfigParser::parse_host(vec![String::from("!a!b!c")]).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].pattern, "a!b!c");
+        assert!(result[0].negated);
+
+        // Only leading ! is negation, rest is literal
+        let result = SshConfigParser::parse_host(vec![String::from("a!b")]).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].pattern, "a!b");
         assert!(!result[0].negated);
     }
 
