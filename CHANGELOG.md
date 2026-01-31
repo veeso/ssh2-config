@@ -1,7 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
-    - [0.6.6](#066)
+    - [0.7.0](#070)
     - [0.6.5](#065)
     - [0.6.4](#064)
     - [0.6.3](#063)
@@ -27,9 +27,15 @@
 
 ---
 
-## 0.6.6
+## 0.7.0
 
 Released on 31/01/2026
+
+### Breaking changes
+
+- Added `InvalidQuotes` variant to `SshParserError` enum
+
+### Improvements
 
 - Multiple `IdentityFile` directives are now accumulated instead of following first-value-wins rule, matching OpenSSH behavior.
 - [Issue 43](https://github.com/veeso/ssh2-config/issues/43): Parser now correctly preserves `#` characters inside quoted strings instead of treating them as comments.
