@@ -1,29 +1,29 @@
 # Changelog
 
 - [Changelog](#changelog)
-    - [0.7.0](#070)
-    - [0.6.5](#065)
-    - [0.6.4](#064)
-    - [0.6.3](#063)
-    - [0.6.2](#062)
-    - [0.6.1](#061)
-    - [0.6.0](#060)
-    - [0.5.4](#054)
-    - [0.5.1](#051)
-    - [0.5.0](#050)
-    - [0.4.0](#040)
-    - [0.3.0](#030)
-    - [0.2.3](#023)
-    - [0.2.2](#022)
-    - [0.2.1](#021)
-    - [0.2.0](#020)
-    - [0.1.6](#016)
-    - [0.1.5](#015)
-    - [0.1.4](#014)
-    - [0.1.3](#013)
-    - [0.1.2](#012)
-    - [0.1.1](#011)
-    - [0.1.0](#010)
+  - [0.7.0](#070)
+  - [0.6.5](#065)
+  - [0.6.4](#064)
+  - [0.6.3](#063)
+  - [0.6.2](#062)
+  - [0.6.1](#061)
+  - [0.6.0](#060)
+  - [0.5.4](#054)
+  - [0.5.1](#051)
+  - [0.5.0](#050)
+  - [0.4.0](#040)
+  - [0.3.0](#030)
+  - [0.2.3](#023)
+  - [0.2.2](#022)
+  - [0.2.1](#021)
+  - [0.2.0](#020)
+  - [0.1.6](#016)
+  - [0.1.5](#015)
+  - [0.1.4](#014)
+  - [0.1.3](#013)
+  - [0.1.2](#012)
+  - [0.1.1](#011)
+  - [0.1.0](#010)
 
 ---
 
@@ -31,22 +31,20 @@
 
 Released on 31/01/2026
 
-### Breaking changes
-
-- Added `InvalidQuotes` variant to `SshParserError` enum
-
-### Improvements
-
-- Multiple `IdentityFile` directives are now accumulated instead of following first-value-wins rule, matching OpenSSH behavior.
-- [Issue 43](https://github.com/veeso/ssh2-config/issues/43): Parser now correctly preserves `#` characters inside quoted strings instead of treating them as comments.
-- [Issue 45](https://github.com/veeso/ssh2-config/issues/45): Parser now returns an error for mismatched quotes instead of silently ignoring them.
+- **BREAKING CHANGE**: Added `InvalidQuotes` variant to `SshParserError` enum
+- Multiple `IdentityFile` directives are now accumulated instead of following first-value-wins rule, matching OpenSSH
+  behavior.
+- [Issue 43](https://github.com/veeso/ssh2-config/issues/43): Parser now correctly preserves `#` characters inside
+  quoted strings instead of treating them as comments.
+- [Issue 45](https://github.com/veeso/ssh2-config/issues/45): Parser now returns an error for mismatched quotes instead
+  of silently ignoring them.
 
 ## 0.6.5
 
 Released on 14/01/2026
 
 - [Issue 37](https://github.com/veeso/ssh2-config/issues/37): KEX Algorithms were invalidly extracted
-    - Also removed duplicated and invalid algorithms from the default list.
+  - Also removed duplicated and invalid algorithms from the default list.
 
 ## 0.6.4
 
@@ -59,9 +57,9 @@ Released on 13/01/2026
 Released on 13/01/2026
 
 - [Issue 32](https://github.com/veeso/ssh2-config/issues/32): Added missing field to serializer:
-    - `AddKeysToAgent`
-    - `ForwardAgent`
-    - `ProxyJump`
+  - `AddKeysToAgent`
+  - `ForwardAgent`
+  - `ProxyJump`
 - [Issue 33](https://github.com/veeso/ssh2-config/issues/33): Parse `~` in include paths.
 - [Issue 34](https://github.com/veeso/ssh2-config/issues/34): Fix parsing of multiple algos on the same row.
 - Updated default algos to `V_10_2_P1`
@@ -111,10 +109,10 @@ Released on 27/03/2025
 - [issue 22](https://github.com/veeso/ssh2-config/issues/22): should parse tokens with `=` and quotes (`"`)
 - [issue 21](https://github.com/veeso/ssh2-config/issues/21): Finally fixed how parameters are applied to host patterns
 - Replaced algorithms `Vec<String>` with `Algorithms` type.
-    - The new type is a variant with `Append`, `Head`, `Exclude` and `Set`.
-    - This allows to **ACTUALLY** handle algorithms correctly.
-    - To pass to ssh options, use `algorithms()` method
-    - Beware that when accessing the internal vec, you MUST care of what it means for that variant.
+  - The new type is a variant with `Append`, `Head`, `Exclude` and `Set`.
+  - This allows to **ACTUALLY** handle algorithms correctly.
+  - To pass to ssh options, use `algorithms()` method
+  - Beware that when accessing the internal vec, you MUST care of what it means for that variant.
 - Replaced `HostParams::merge` with `HostParams::overwrite_if_none` to avoid overwriting existing values.
 - Added default Algorithms to the SshConfig structure. See readme for details on how to use it.
 
@@ -187,8 +185,8 @@ Released on 09/05/2023
 Released on 03/03/2023
 
 - Added legacy field support
-    - HostbasedKeyTypes
-    - PubkeyAcceptedKeyTypes
+  - HostbasedKeyTypes
+  - PubkeyAcceptedKeyTypes
 
 ## 0.1.5
 
