@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+    - [0.6.6](#066)
     - [0.6.5](#065)
     - [0.6.4](#064)
     - [0.6.3](#063)
@@ -25,6 +26,12 @@
     - [0.1.0](#010)
 
 ---
+
+## 0.6.6
+
+Released on 31/01/2026
+
+- Multiple `IdentityFile` directives are now accumulated instead of following first-value-wins rule, matching OpenSSH behavior.
 
 ## 0.6.5
 

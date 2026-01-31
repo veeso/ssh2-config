@@ -42,7 +42,8 @@ pub struct HostParams {
     pub host_name: Option<String>,
     /// Specifies the path of the identity file to be used when authenticating.
     /// More than one file can be specified.
-    /// If more than one file is specified, they will be read in order
+    /// If more than one file is specified, they will be read in order.
+    /// There may be multiple lines of this directive; in case subsequent lines will be appended to the previous ones.
     pub identity_file: Option<Vec<PathBuf>>,
     /// Specifies a pattern-list of unknown options to be ignored if they are encountered in configuration parsing
     pub ignore_unknown: Option<Vec<String>>,
@@ -137,10 +138,12 @@ impl HostParams {
         self.connect_timeout = self.connect_timeout.or(b.connect_timeout);
         self.forward_agent = self.forward_agent.or(b.forward_agent);
         self.host_name = self.host_name.clone().or_else(|| b.host_name.clone());
-        self.identity_file = self
-            .identity_file
-            .clone()
-            .or_else(|| b.identity_file.clone());
+        // IdentityFile accumulates across Host blocks (unlike other directives)
+        match (&mut self.identity_file, &b.identity_file) {
+            (Some(existing), Some(other)) => existing.extend(other.clone()),
+            (None, Some(other)) => self.identity_file = Some(other.clone()),
+            _ => {}
+        }
         self.ignore_unknown = self
             .ignore_unknown
             .clone()
@@ -451,5 +454,44 @@ mod tests {
 
         // Self's cipher should remain since it was already overridden
         assert_eq!(params.ciphers.algorithms(), &["self-cipher".to_string()]);
+    }
+
+    #[test]
+    fn test_overwrite_if_none_accumulates_identity_files() {
+        let mut params = HostParams::new(&DefaultAlgorithms::empty());
+        params.identity_file = Some(vec![std::path::PathBuf::from("/path/to/key1")]);
+
+        let mut b = HostParams::new(&DefaultAlgorithms::empty());
+        b.identity_file = Some(vec![
+            std::path::PathBuf::from("/path/to/key2"),
+            std::path::PathBuf::from("/path/to/key3"),
+        ]);
+
+        params.overwrite_if_none(&b);
+
+        // Identity files should be accumulated, not replaced
+        assert_eq!(
+            params.identity_file,
+            Some(vec![
+                std::path::PathBuf::from("/path/to/key1"),
+                std::path::PathBuf::from("/path/to/key2"),
+                std::path::PathBuf::from("/path/to/key3"),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_overwrite_if_none_identity_files_when_self_is_none() {
+        let mut params = HostParams::new(&DefaultAlgorithms::empty());
+
+        let mut b = HostParams::new(&DefaultAlgorithms::empty());
+        b.identity_file = Some(vec![std::path::PathBuf::from("/path/to/key1")]);
+
+        params.overwrite_if_none(&b);
+
+        assert_eq!(
+            params.identity_file,
+            Some(vec![std::path::PathBuf::from("/path/to/key1")])
+        );
     }
 }

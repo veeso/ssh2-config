@@ -266,7 +266,11 @@ impl SshConfigParser {
             Field::IdentityFile => {
                 let value = Self::parse_path_list(args)?;
                 trace!("identity_file: {value:?}",);
-                params.identity_file = Some(value);
+                if let Some(existing) = &mut params.identity_file {
+                    existing.extend(value);
+                } else {
+                    params.identity_file = Some(value);
+                }
             }
             Field::IgnoreUnknown => {
                 let value = Self::parse_comma_separated_list(args)?;
@@ -1797,6 +1801,58 @@ mod tests {
             vec![
                 PathBuf::from("/path/to/key1"),
                 PathBuf::from("/path/to/key2")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_should_allow_and_append_multiple_identity_files_directives() {
+        crate::test_log();
+        let config = r##"
+Host test
+    IdentityFile /path/to/key1 /path/to/key2
+    IdentityFile /path/to/key3
+"##;
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)
+            .expect("Failed to parse config");
+
+        let params = config.query("test");
+        assert_eq!(
+            params.identity_file.as_ref().unwrap(),
+            &vec![
+                PathBuf::from("/path/to/key1"),
+                PathBuf::from("/path/to/key2"),
+                PathBuf::from("/path/to/key3"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_should_accumulate_identity_files_across_host_blocks() {
+        crate::test_log();
+        let config = r##"
+Host test
+    IdentityFile /path/to/specific_key
+
+Host *
+    IdentityFile /path/to/default_key
+"##;
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)
+            .expect("Failed to parse config");
+
+        let params = config.query("test");
+        // Both identity files should be present: specific first, then default
+        assert_eq!(
+            params.identity_file.as_ref().unwrap(),
+            &vec![
+                PathBuf::from("/path/to/specific_key"),
+                PathBuf::from("/path/to/default_key"),
             ]
         );
     }
