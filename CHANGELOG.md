@@ -38,6 +38,8 @@ Released on 31/01/2026
   quoted strings instead of treating them as comments.
 - [Issue 45](https://github.com/veeso/ssh2-config/issues/45): Parser now returns an error for mismatched quotes instead
   of silently ignoring them.
+- [Issue 44](https://github.com/veeso/ssh2-config/issues/44): Parser now handles escape sequences (`\"`, `\\`, `\'`)
+  within quoted arguments.
 
 ## 0.6.5
 

@@ -198,6 +198,75 @@ impl SshConfigParser {
         result
     }
 
+    /// Count unescaped double quotes in a string.
+    /// A quote is considered escaped if preceded by a backslash that is not itself escaped.
+    fn count_unescaped_quotes(s: &str) -> usize {
+        let mut count = 0;
+        let chars: Vec<char> = s.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i] == '\\' && i + 1 < chars.len() {
+                // Skip the escaped character
+                i += 2;
+            } else if chars[i] == '"' {
+                count += 1;
+                i += 1;
+            } else {
+                i += 1;
+            }
+        }
+        count
+    }
+
+    /// Check if a string ends with an unescaped double quote.
+    fn ends_with_unescaped_quote(s: &str) -> bool {
+        if !s.ends_with('"') {
+            return false;
+        }
+        // Count trailing backslashes before the final quote
+        let chars: Vec<char> = s.chars().collect();
+        let mut backslash_count = 0;
+        for i in (0..chars.len() - 1).rev() {
+            if chars[i] == '\\' {
+                backslash_count += 1;
+            } else {
+                break;
+            }
+        }
+        // If even number of backslashes, the quote is unescaped
+        backslash_count % 2 == 0
+    }
+
+    /// Process escape sequences in a string.
+    /// Handles: \" -> ", \\ -> \, \' -> '
+    /// Unrecognized escapes preserve the backslash.
+    fn unescape_string(s: &str) -> String {
+        let mut result = String::with_capacity(s.len());
+        let chars: Vec<char> = s.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i] == '\\' && i + 1 < chars.len() {
+                let next = chars[i + 1];
+                match next {
+                    '"' | '\\' | '\'' => {
+                        // Recognized escape sequence: skip backslash, add the character
+                        result.push(next);
+                        i += 2;
+                    }
+                    _ => {
+                        // Unrecognized escape: preserve the backslash
+                        result.push(chars[i]);
+                        i += 1;
+                    }
+                }
+            } else {
+                result.push(chars[i]);
+                i += 1;
+            }
+        }
+        result
+    }
+
     /// Update current given host with field argument
     fn update_host(
         field: Field,
@@ -529,16 +598,18 @@ impl SshConfigParser {
         let other_tokens = other_tokens.trim().trim_start_matches('=').trim();
         trace!("other tokens trimmed: '{other_tokens}'",);
 
-        // Validate quotes - odd number of quotes means mismatched quotes
-        let quote_count = other_tokens.chars().filter(|&c| c == '"').count();
-        if quote_count % 2 != 0 {
+        // Validate quotes - count unescaped quotes (not preceded by backslash)
+        let unescaped_quote_count = Self::count_unescaped_quotes(other_tokens);
+        if unescaped_quote_count % 2 != 0 {
             return Err(SshParserError::InvalidQuotes);
         }
 
         // if args is quoted, don't split it
-        let args = if other_tokens.starts_with('"') && other_tokens.ends_with('"') {
+        let args = if other_tokens.starts_with('"') && Self::ends_with_unescaped_quote(other_tokens)
+        {
             trace!("quoted args: '{other_tokens}'",);
-            vec![other_tokens[1..other_tokens.len() - 1].to_string()]
+            let content = &other_tokens[1..other_tokens.len() - 1];
+            vec![Self::unescape_string(content)]
         } else {
             trace!("splitting args (non-quoted): '{other_tokens}'",);
             // split by whitespace
@@ -1974,6 +2045,137 @@ Host test
             SshConfigParser::tokenize_line("Ciphers=\"aes256-ctr,aes128-ctr\"").unwrap();
         assert_eq!(field, Field::Ciphers);
         assert_eq!(args, vec!["aes256-ctr,aes128-ctr".to_string()]);
+    }
+
+    #[test]
+    fn should_unescape_quoted_args() {
+        crate::test_log();
+
+        // Test escaped double quote: \" -> "
+        let (field, args) =
+            SshConfigParser::tokenize_line(r#"HostName "gateway\"server""#).unwrap();
+        assert_eq!(field, Field::HostName);
+        assert_eq!(args, vec![r#"gateway"server"#.to_string()]);
+
+        // Test escaped backslash: \\ -> \
+        let (field, args) = SshConfigParser::tokenize_line(r#"HostName "path\\to\\host""#).unwrap();
+        assert_eq!(field, Field::HostName);
+        assert_eq!(args, vec![r#"path\to\host"#.to_string()]);
+
+        // Test escaped single quote: \' -> '
+        let (field, args) = SshConfigParser::tokenize_line(r#"HostName "it\'s a test""#).unwrap();
+        assert_eq!(field, Field::HostName);
+        assert_eq!(args, vec!["it's a test".to_string()]);
+
+        // Test multiple escape sequences combined
+        let (field, args) =
+            SshConfigParser::tokenize_line(r#"HostName "say \"hello\" and \\go""#).unwrap();
+        assert_eq!(field, Field::HostName);
+        assert_eq!(args, vec![r#"say "hello" and \go"#.to_string()]);
+
+        // Test unrecognized escape sequence (backslash preserved)
+        let (field, args) = SshConfigParser::tokenize_line(r#"HostName "test\nvalue""#).unwrap();
+        assert_eq!(field, Field::HostName);
+        assert_eq!(args, vec![r#"test\nvalue"#.to_string()]);
+    }
+
+    #[test]
+    fn should_count_unescaped_quotes() {
+        crate::test_log();
+
+        // No quotes
+        assert_eq!(SshConfigParser::count_unescaped_quotes("hello"), 0);
+
+        // Simple unescaped quotes
+        assert_eq!(SshConfigParser::count_unescaped_quotes(r#""hello""#), 2);
+
+        // Escaped quotes should not be counted
+        assert_eq!(SshConfigParser::count_unescaped_quotes(r#"\"hello\""#), 0);
+
+        // Mixed escaped and unescaped
+        assert_eq!(
+            SshConfigParser::count_unescaped_quotes(r#""hello\"world""#),
+            2
+        );
+
+        // Escaped backslash before quote (quote is unescaped)
+        assert_eq!(SshConfigParser::count_unescaped_quotes(r#"\\""#), 1);
+
+        // Empty string
+        assert_eq!(SshConfigParser::count_unescaped_quotes(""), 0);
+
+        // Only escaped quote
+        assert_eq!(SshConfigParser::count_unescaped_quotes(r#"\""#), 0);
+    }
+
+    #[test]
+    fn should_detect_ends_with_unescaped_quote() {
+        crate::test_log();
+
+        // Ends with unescaped quote
+        assert!(SshConfigParser::ends_with_unescaped_quote(r#""hello""#));
+
+        // Ends with escaped quote (odd backslashes)
+        assert!(!SshConfigParser::ends_with_unescaped_quote(r#""hello\""#));
+
+        // Ends with escaped backslash then unescaped quote
+        assert!(SshConfigParser::ends_with_unescaped_quote(r#""hello\\""#));
+
+        // Ends with three backslashes then quote (escaped)
+        assert!(!SshConfigParser::ends_with_unescaped_quote(r#""hello\\\""#));
+
+        // Doesn't end with quote at all
+        assert!(!SshConfigParser::ends_with_unescaped_quote("hello"));
+
+        // Single quote
+        assert!(SshConfigParser::ends_with_unescaped_quote(r#"""#));
+
+        // Single escaped quote
+        assert!(!SshConfigParser::ends_with_unescaped_quote(r#"\""#));
+    }
+
+    #[test]
+    fn should_unescape_string() {
+        crate::test_log();
+
+        // Escaped double quote
+        assert_eq!(
+            SshConfigParser::unescape_string(r#"hello\"world"#),
+            r#"hello"world"#
+        );
+
+        // Escaped backslash
+        assert_eq!(
+            SshConfigParser::unescape_string(r#"path\\to\\file"#),
+            r#"path\to\file"#
+        );
+
+        // Escaped single quote
+        assert_eq!(SshConfigParser::unescape_string(r#"it\'s"#), "it's");
+
+        // Multiple escape sequences
+        assert_eq!(
+            SshConfigParser::unescape_string(r#"say \"hi\" and \\go"#),
+            r#"say "hi" and \go"#
+        );
+
+        // Unrecognized escape (backslash preserved)
+        assert_eq!(
+            SshConfigParser::unescape_string(r#"test\nvalue"#),
+            r#"test\nvalue"#
+        );
+
+        // No escapes
+        assert_eq!(SshConfigParser::unescape_string("plain text"), "plain text");
+
+        // Empty string
+        assert_eq!(SshConfigParser::unescape_string(""), "");
+
+        // Trailing backslash (no char to escape)
+        assert_eq!(SshConfigParser::unescape_string(r#"test\"#), r#"test\"#);
+
+        // Double escaped backslash
+        assert_eq!(SshConfigParser::unescape_string(r#"\\\\"#), r#"\\"#);
     }
 
     #[test]
