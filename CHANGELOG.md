@@ -33,6 +33,7 @@ Released on 31/01/2026
 
 - Multiple `IdentityFile` directives are now accumulated instead of following first-value-wins rule, matching OpenSSH behavior.
 - [Issue 43](https://github.com/veeso/ssh2-config/issues/43): Parser now correctly preserves `#` characters inside quoted strings instead of treating them as comments.
+- [Issue 45](https://github.com/veeso/ssh2-config/issues/45): Parser now returns an error for mismatched quotes instead of silently ignoring them.
 
 ## 0.6.5
 

@@ -48,6 +48,8 @@ pub enum SshParserError {
     Io(#[from] IoError),
     #[error("glob error: {0}")]
     Glob(#[from] glob::GlobError),
+    #[error("invalid quotes")]
+    InvalidQuotes,
     #[error("missing argument")]
     MissingArgument,
     #[error("pattern error: {0}")]
@@ -526,6 +528,12 @@ impl SshConfigParser {
         // other tokens should trim = and whitespace
         let other_tokens = other_tokens.trim().trim_start_matches('=').trim();
         trace!("other tokens trimmed: '{other_tokens}'",);
+
+        // Validate quotes - odd number of quotes means mismatched quotes
+        let quote_count = other_tokens.chars().filter(|&c| c == '"').count();
+        if quote_count % 2 != 0 {
+            return Err(SshParserError::InvalidQuotes);
+        }
 
         // if args is quoted, don't split it
         let args = if other_tokens.starts_with('"') && other_tokens.ends_with('"') {
@@ -1356,6 +1364,27 @@ mod tests {
         assert!(matches!(
             SshConfigParser::tokenize_line("                  ").unwrap_err(),
             SshParserError::MissingArgument
+        ));
+    }
+
+    #[test]
+    fn should_fail_on_mismatched_quotes() {
+        crate::test_log();
+
+        // Unclosed opening quote
+        assert!(matches!(
+            SshConfigParser::tokenize_line(r#"Hostname "example.com"#).unwrap_err(),
+            SshParserError::InvalidQuotes
+        ));
+        // Unexpected closing quote (no opening)
+        assert!(matches!(
+            SshConfigParser::tokenize_line(r#"Hostname example.com""#).unwrap_err(),
+            SshParserError::InvalidQuotes
+        ));
+        // Quote in middle, unclosed
+        assert!(matches!(
+            SshConfigParser::tokenize_line(r#"Hostname foo "bar"#).unwrap_err(),
+            SshParserError::InvalidQuotes
         ));
     }
 
