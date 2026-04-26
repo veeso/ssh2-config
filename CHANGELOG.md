@@ -1,6 +1,8 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.7.1](#071)
+    - [Fixed](#fixed)
   - [0.7.0](#070)
   - [0.6.5](#065)
   - [0.6.4](#064)
@@ -26,6 +28,19 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.7.1
+
+Released on 2026-04-26
+
+### Fixed
+
+- **parser:** preserve quoted spans with whitespace across multiple args (#52)
+  > Previously, tokenize_line only handled a single fully-quoted argument; multi-argument
+  > lines split on whitespace and broke quoted values containing spaces (e.g. SetEnv
+  > TEST="Test 2"). Introduce split_args_respecting_quotes to walk chars with quote-state,
+  > keeping quoted spans intact and preserving backslash escapes verbatim. Single fully-
+  > quoted args continue to be stripped and unescaped for backward compatibility.
 
 ## 0.7.0
 

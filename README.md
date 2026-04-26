@@ -1,10 +1,9 @@
 # ssh2-config
 
-[![license-mit](https://img.shields.io/crates/l/ssh2-config.svg)](https://opensource.org/licenses/MIT)
+[![license-mit](https://img.shields.io/crates/l/ssh2-config.svg?logo=rust)](https://opensource.org/licenses/MIT)
 [![repo-stars](https://img.shields.io/github/stars/veeso/ssh2-config?style=flat)](https://github.com/veeso/ssh2-config/stargazers)
-[![downloads](https://img.shields.io/crates/d/ssh2-config.svg)](https://crates.io/crates/ssh2-config)
-[![latest-version](https://img.shields.io/crates/v/ssh2-config.svg)](https://crates.io/crates/ssh2-config)
-[![ko-fi](https://img.shields.io/badge/donate-ko--fi-red)](https://ko-fi.com/veeso)
+[![downloads](https://img.shields.io/crates/d/ssh2-config.svg?logo=rust)](https://crates.io/crates/ssh2-config)
+[![latest-version](https://img.shields.io/crates/v/ssh2-config.svg?logo=rust)](https://crates.io/crates/ssh2-config)
 [![conventional-commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
 
 [![Build](https://github.com/veeso/ssh2-config/actions/workflows/build.yml/badge.svg)](https://github.com/veeso/ssh2-config/actions/workflows/build.yml)
@@ -14,19 +13,19 @@
 ---
 
 - [ssh2-config](#ssh2-config)
-    - [About ssh2-config](#about-ssh2-config)
-        - [Exposed attributes](#exposed-attributes)
-        - [Missing features](#missing-features)
-    - [Get started 🚀](#get-started)
-        - [Reading unsupported fields](#reading-unsupported-fields)
-    - [How host parameters are resolved](#how-host-parameters-are-resolved)
-        - [Resolvers examples](#resolvers-examples)
-    - [Configuring default algorithms](#configuring-default-algorithms)
-        - [Examples](#examples)
-    - [Support the developer ☕](#support-the-developer-)
-    - [Contributing and issues 🤝🏻](#contributing-and-issues-)
-    - [Changelog ⏳](#changelog-)
-    - [License 📃](#license-)
+  - [About ssh2-config](#about-ssh2-config)
+    - [Exposed attributes](#exposed-attributes)
+    - [Missing features](#missing-features)
+  - [Get started](#get-started)
+    - [Reading unsupported fields](#reading-unsupported-fields)
+  - [How host parameters are resolved](#how-host-parameters-are-resolved)
+    - [Resolvers examples](#resolvers-examples)
+  - [Configuring default algorithms](#configuring-default-algorithms)
+    - [Examples](#examples)
+  - [Support the developer ☕](#support-the-developer-)
+  - [Contributing and issues 🤝🏻](#contributing-and-issues-)
+  - [Changelog ⏳](#changelog-)
+  - [License 📃](#license-)
 
 ---
 
