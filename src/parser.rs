@@ -198,6 +198,47 @@ impl SshConfigParser {
         result
     }
 
+    /// Split an argument string by whitespace while keeping quoted spans (`"..."`) as part of
+    /// the same token. Backslash escapes inside quotes (`\"`, `\\`) are preserved verbatim so
+    /// the caller can decide whether to unescape. Tokens may mix quoted and unquoted parts
+    /// (e.g. `KEY="value with spaces"`).
+    fn split_args_respecting_quotes(s: &str) -> Vec<String> {
+        let mut result = Vec::new();
+        let mut current = String::new();
+        let mut has_token = false;
+        let mut in_quotes = false;
+        let mut chars = s.chars().peekable();
+        while let Some(c) = chars.next() {
+            if in_quotes {
+                current.push(c);
+                if c == '\\' {
+                    if let Some(&nc) = chars.peek() {
+                        current.push(nc);
+                        chars.next();
+                    }
+                } else if c == '"' {
+                    in_quotes = false;
+                }
+            } else if c.is_whitespace() {
+                if has_token {
+                    result.push(std::mem::take(&mut current));
+                    has_token = false;
+                }
+            } else if c == '"' {
+                current.push(c);
+                in_quotes = true;
+                has_token = true;
+            } else {
+                current.push(c);
+                has_token = true;
+            }
+        }
+        if has_token {
+            result.push(current);
+        }
+        result
+    }
+
     /// Count unescaped double quotes in a string.
     /// A quote is considered escaped if preceded by a backslash that is not itself escaped.
     fn count_unescaped_quotes(s: &str) -> usize {
@@ -604,21 +645,22 @@ impl SshConfigParser {
             return Err(SshParserError::InvalidQuotes);
         }
 
-        // if args is quoted, don't split it
-        let args = if other_tokens.starts_with('"') && Self::ends_with_unescaped_quote(other_tokens)
+        // split arguments while respecting quoted spans (whitespace inside quotes is preserved)
+        let raw_tokens = Self::split_args_respecting_quotes(other_tokens);
+
+        // if entire args is a single fully-quoted token, strip quotes and unescape
+        let args = if raw_tokens.len() == 1
+            && raw_tokens[0].starts_with('"')
+            && raw_tokens[0].len() >= 2
+            && Self::ends_with_unescaped_quote(&raw_tokens[0])
         {
-            trace!("quoted args: '{other_tokens}'",);
-            let content = &other_tokens[1..other_tokens.len() - 1];
+            trace!("quoted args: '{}'", raw_tokens[0]);
+            let t = &raw_tokens[0];
+            let content = &t[1..t.len() - 1];
             vec![Self::unescape_string(content)]
         } else {
-            trace!("splitting args (non-quoted): '{other_tokens}'",);
-            // split by whitespace
-            let tokens = other_tokens.split_whitespace();
-
-            tokens
-                .map(|x| x.trim().to_string())
-                .filter(|x| !x.is_empty())
-                .collect()
+            trace!("split args: {:?}", raw_tokens);
+            raw_tokens
         };
 
         match Field::from_str(field) {
@@ -2078,6 +2120,26 @@ Host test
         let (field, args) = SshConfigParser::tokenize_line(r#"HostName "test\nvalue""#).unwrap();
         assert_eq!(field, Field::HostName);
         assert_eq!(args, vec![r#"test\nvalue"#.to_string()]);
+    }
+
+    #[test]
+    fn should_tokenize_line_setenv() -> Result<(), SshParserError> {
+        crate::test_log();
+        assert_eq!(
+            SshConfigParser::tokenize_line(
+                r#"SetEnv TEST_1=Test1 TEST_2="Test 2" TEST_3="Test \"3\"" TEST_4=Test"4""#
+            )?,
+            (
+                Field::SetEnv,
+                vec![
+                    r#"TEST_1=Test1"#.to_owned(),
+                    r#"TEST_2="Test 2""#.to_owned(),
+                    r#"TEST_3="Test \"3\"""#.to_owned(),
+                    r#"TEST_4=Test"4""#.to_owned(),
+                ]
+            )
+        );
+        Ok(())
     }
 
     #[test]
