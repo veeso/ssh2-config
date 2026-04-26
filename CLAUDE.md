@@ -32,7 +32,7 @@ cargo run --example print -- [config-path]
 cargo run --example client -- <host> [config-path]
 
 # Regenerate default algorithms from OpenSSH source
-RELOAD_SSH_ALGO=1 cargo build
+cargo build --features reload-ssh-algo
 ```
 
 **Test environment setup:** Tests require `~/.ssh/config` to exist (can be empty).
