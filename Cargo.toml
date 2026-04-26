@@ -40,12 +40,13 @@ ssh2 = "^0.9"
 tempfile = "^3"
 
 [build-dependencies]
-anyhow = "1"
-git2 = "0.20"
+anyhow = { version = "1", optional = true }
+git2 = { version = "0.20", optional = true }
 
 [features]
 default = []
 nolog = ["log/max_level_off"]
+reload-ssh-algo = ["dep:anyhow", "dep:git2"]
 
 [[example]]
 name = "client"
