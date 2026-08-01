@@ -41,7 +41,9 @@ tempfile = "3"
 
 [build-dependencies]
 anyhow = { version = "1", optional = true }
-git2 = { version = "0.21", optional = true }
+git2 = { version = "0.21", default-features = false, features = [
+    "https",
+], optional = true }
 
 [features]
 default = []
