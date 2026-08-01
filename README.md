@@ -6,7 +6,7 @@
 [![latest-version](https://img.shields.io/crates/v/ssh2-config.svg?logo=rust)](https://crates.io/crates/ssh2-config)
 [![conventional-commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
 
-[![Build](https://github.com/veeso/ssh2-config/actions/workflows/build.yml/badge.svg)](https://github.com/veeso/ssh2-config/actions/workflows/build.yml)
+[![ci](https://github.com/veeso/ssh2-config/actions/workflows/ci.yml/badge.svg)](https://github.com/veeso/ssh2-config/actions/workflows/ci.yml)
 [![coveralls](https://coveralls.io/repos/github/veeso/ssh2-config/badge.svg)](https://coveralls.io/github/veeso/ssh2-config)
 [![docs](https://docs.rs/ssh2-config/badge.svg)](https://docs.rs/ssh2-config)
 
