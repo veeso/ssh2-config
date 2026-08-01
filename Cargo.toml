@@ -19,29 +19,29 @@ license = "MIT"
 name = "ssh2-config"
 readme = "README.md"
 repository = "https://github.com/veeso/ssh2-config"
-version = "0.7.1"
+version = "0.7.2"
 build = "build/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags = "^2"
-dirs = "^6"
-log = "^0.4"
+bitflags = "2"
+dirs = "6"
+log = "0.4"
 glob = "0.3"
-thiserror = "^2"
-wildmatch = "^2"
+thiserror = "2"
+wildmatch = "2"
 
 [dev-dependencies]
-env_logger = "^0.11"
-pretty_assertions = "^1"
-rpassword = "^7"
-ssh2 = "^0.9"
-tempfile = "^3"
+env_logger = "0.11"
+pretty_assertions = "1"
+rpassword = "7"
+ssh2 = "0.9"
+tempfile = "3"
 
 [build-dependencies]
 anyhow = { version = "1", optional = true }
-git2 = { version = "0.20", optional = true }
+git2 = { version = "0.21", optional = true }
 
 [features]
 default = []

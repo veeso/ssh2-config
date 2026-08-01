@@ -1,8 +1,10 @@
 # Changelog
 
 - [Changelog](#changelog)
-  - [0.7.1](#071)
+  - [0.7.2](#072)
     - [Fixed](#fixed)
+  - [0.7.1](#071)
+    - [Fixed](#fixed-1)
   - [0.7.0](#070)
   - [0.6.5](#065)
   - [0.6.4](#064)
@@ -28,6 +30,17 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.7.2
+
+Released on 2026-08-01
+
+### Fixed
+
+- gate build deps behind reload-ssh-algo feature
+  > Replace RELOAD_SSH_ALGO env var with optional cargo feature. Makes
+  > anyhow and git2 (and openssl C bindings) optional build dependencies,
+  > only compiled when the feature is enabled.
 
 ## 0.7.1
 
