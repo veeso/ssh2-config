@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::define_parser::parse_defines;
 
-const OPENSSH_TAG: &str = "V_10_2_P1";
+const OPENSSH_TAG: &str = "V_10_5_P1";
 
 /// Default algorithms for ssh.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
