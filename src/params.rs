@@ -3,11 +3,13 @@
 //! Ssh config params for host rule
 
 mod algos;
+mod remote_forward;
 
 use std::collections::HashMap;
 
 pub use self::algos::Algorithms;
 pub(crate) use self::algos::AlgorithmsRule;
+pub use self::remote_forward::{RemoteForward, RemoteForwardDestination, RemoteForwardListen};
 use super::{Duration, PathBuf};
 use crate::DefaultAlgorithms;
 
@@ -59,8 +61,8 @@ pub struct HostParams {
     pub pubkey_accepted_algorithms: Algorithms,
     /// Specifies whether to try public key authentication using SSH keys
     pub pubkey_authentication: Option<bool>,
-    /// Specifies that a TCP port on the remote machine be forwarded over the secure channel
-    pub remote_forward: Option<u16>,
+    /// Specifies remote forwarding listeners and their optional destinations.
+    pub remote_forward: Vec<RemoteForward>,
     /// Sets a timeout interval in seconds after which if no data has been received from the server, keep alive will be sent
     pub server_alive_interval: Option<Duration>,
     /// Specifies whether to send TCP keepalives to the other side
@@ -102,7 +104,7 @@ impl HostParams {
                 &default_algorithms.pubkey_accepted_algorithms,
             ),
             pubkey_authentication: None,
-            remote_forward: None,
+            remote_forward: Vec::new(),
             server_alive_interval: None,
             tcp_keep_alive: None,
             #[cfg(target_os = "macos")]
@@ -151,7 +153,7 @@ impl HostParams {
         self.port = self.port.or(b.port);
         self.proxy_jump = self.proxy_jump.clone().or_else(|| b.proxy_jump.clone());
         self.pubkey_authentication = self.pubkey_authentication.or(b.pubkey_authentication);
-        self.remote_forward = self.remote_forward.or(b.remote_forward);
+        self.remote_forward.extend_from_slice(&b.remote_forward);
         self.server_alive_interval = self.server_alive_interval.or(b.server_alive_interval);
         #[cfg(target_os = "macos")]
         {
@@ -199,12 +201,48 @@ impl HostParams {
 #[cfg(test)]
 mod tests {
 
+    use std::path::PathBuf;
     use std::str::FromStr;
 
     use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::params::algos::AlgorithmsRule;
+
+    #[test]
+    fn should_model_remote_forward_endpoints() {
+        let port = RemoteForward::new(RemoteForwardListen::Port(8080), None);
+        assert_eq!(port.to_string(), "8080");
+
+        let host = RemoteForward::new(
+            RemoteForwardListen::Host {
+                host: "localhost".to_string(),
+                port: 8080,
+            },
+            Some(RemoteForwardDestination::Host {
+                host: "127.0.0.1".to_string(),
+                port: 80,
+            }),
+        );
+        assert_eq!(host.to_string(), "localhost:8080 127.0.0.1:80");
+
+        let socket = RemoteForward::new(
+            RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote socket")),
+            Some(RemoteForwardDestination::UnixSocket(PathBuf::from(
+                "/tmp/local.sock",
+            ))),
+        );
+        assert_eq!(socket.to_string(), "\"/tmp/remote socket\" /tmp/local.sock");
+
+        let ipv6 = RemoteForward::new(
+            RemoteForwardListen::Host {
+                host: "::1".to_string(),
+                port: 8080,
+            },
+            None,
+        );
+        assert_eq!(ipv6.to_string(), "[::1]:8080");
+    }
 
     #[test]
     fn should_initialize_params() {
@@ -244,7 +282,7 @@ mod tests {
             DefaultAlgorithms::default().pubkey_accepted_algorithms
         );
         assert!(params.pubkey_authentication.is_none());
-        assert!(params.remote_forward.is_none());
+        assert!(params.remote_forward.is_empty());
         assert!(params.server_alive_interval.is_none());
         #[cfg(target_os = "macos")]
         assert!(params.use_keychain.is_none());
@@ -313,7 +351,7 @@ mod tests {
         b.port = Some(22);
         b.proxy_jump = Some(vec!["proxy".to_string()]);
         b.pubkey_authentication = Some(true);
-        b.remote_forward = Some(8080);
+        b.remote_forward = vec![RemoteForward::new(RemoteForwardListen::Port(8080), None)];
         b.server_alive_interval = Some(Duration::from_secs(60));
         b.tcp_keep_alive = Some(true);
         #[cfg(target_os = "macos")]
@@ -348,7 +386,10 @@ mod tests {
         assert_eq!(params.port, Some(22));
         assert_eq!(params.proxy_jump, Some(vec!["proxy".to_string()]));
         assert_eq!(params.pubkey_authentication, Some(true));
-        assert_eq!(params.remote_forward, Some(8080));
+        assert_eq!(
+            params.remote_forward,
+            vec![RemoteForward::new(RemoteForwardListen::Port(8080), None,)]
+        );
         assert_eq!(params.server_alive_interval, Some(Duration::from_secs(60)));
         assert_eq!(params.tcp_keep_alive, Some(true));
         #[cfg(target_os = "macos")]
@@ -399,6 +440,30 @@ mod tests {
         assert_eq!(
             params.unsupported_fields.get("existing_unsup"),
             Some(&vec!["val1".to_string()])
+        );
+    }
+
+    #[test]
+    fn should_accumulate_remote_forwards_when_merging() {
+        let mut params = HostParams::new(&DefaultAlgorithms::empty());
+        params.remote_forward = vec![RemoteForward::new(RemoteForwardListen::Port(8080), None)];
+        let mut other = HostParams::new(&DefaultAlgorithms::empty());
+        other.remote_forward = vec![RemoteForward::new(
+            RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote.sock")),
+            None,
+        )];
+
+        params.overwrite_if_none(&other);
+
+        assert_eq!(
+            params.remote_forward,
+            vec![
+                RemoteForward::new(RemoteForwardListen::Port(8080), None),
+                RemoteForward::new(
+                    RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote.sock")),
+                    None,
+                ),
+            ]
         );
     }
 

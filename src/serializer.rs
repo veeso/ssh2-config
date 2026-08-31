@@ -180,7 +180,7 @@ impl SshConfigSerializer<'_> {
                 if *pubkey_authentication { "yes" } else { "no" }
             )?;
         }
-        if let Some(remote_forward) = params.remote_forward.as_ref() {
+        for remote_forward in &params.remote_forward {
             writeln!(f, "{padding}RemoteForward {remote_forward}",)?;
         }
         if let Some(server_alive_interval) = params.server_alive_interval {
@@ -245,10 +245,13 @@ impl<'a> From<&'a SshConfig> for SshConfigSerializer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::time::Duration;
 
     use super::*;
-    use crate::{DefaultAlgorithms, HostClause};
+    use crate::{
+        DefaultAlgorithms, HostClause, RemoteForward, RemoteForwardDestination, RemoteForwardListen,
+    };
 
     #[test]
     fn are_host_patterns_combined() {
@@ -292,6 +295,45 @@ mod tests {
     }
 
     #[test]
+    fn serialize_remote_forward_variants() {
+        let mut params = HostParams::new(&DefaultAlgorithms::empty());
+        params.remote_forward = vec![
+            RemoteForward::new(RemoteForwardListen::Port(8080), None),
+            RemoteForward::new(
+                RemoteForwardListen::Host {
+                    host: "::1".to_string(),
+                    port: 8081,
+                },
+                Some(RemoteForwardDestination::Host {
+                    host: "localhost".to_string(),
+                    port: 80,
+                }),
+            ),
+            RemoteForward::new(
+                RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote socket")),
+                Some(RemoteForwardDestination::UnixSocket(PathBuf::from(
+                    "/tmp/local.sock",
+                ))),
+            ),
+        ];
+        let host = Host::new(
+            vec![HostClause::new(String::from("test-host"), false)],
+            params,
+        );
+
+        assert_eq!(
+            SshConfig::from_hosts(vec![host]).to_string(),
+            concat!(
+                "Host test-host\n",
+                "    RemoteForward 8080\n",
+                "    RemoteForward [::1]:8081 localhost:80\n",
+                "    RemoteForward \"/tmp/remote socket\" /tmp/local.sock\n",
+                "\n",
+            )
+        );
+    }
+
+    #[test]
     fn serialize_first_host_not_default() {
         // When first host is not a default "*" pattern, it should be serialized with Host directive
         let mut host_params = HostParams::new(&DefaultAlgorithms::empty());
@@ -325,7 +367,7 @@ mod tests {
         params.port = Some(22);
         params.proxy_jump = Some(vec!["jump1".to_string(), "jump2".to_string()]);
         params.pubkey_authentication = Some(false);
-        params.remote_forward = Some(8080);
+        params.remote_forward = vec![RemoteForward::new(RemoteForwardListen::Port(8080), None)];
         params.server_alive_interval = Some(Duration::from_secs(60));
         params.tcp_keep_alive = Some(false);
         #[cfg(target_os = "macos")]

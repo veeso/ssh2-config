@@ -68,11 +68,15 @@ invalid configuration will result in a parsing error.
 - **Port**: you can use this attribute to resolve the port to connect to
 - **ProxyJump**: you can use this attribute to specify hosts to jump via
 - **PubkeyAuthentication**: you can use this attribute to set whether to use the pubkey authentication
-- **RemoteForward**: you can use this method to implement port forwarding with `session.channel_forward_listen()`
+- **RemoteForward**: exposes every remote listener and optional destination as typed port, host-and-port, or Unix
+  socket variants. Repeated directives are preserved in configuration order.
 - **ServerAliveInterval**: you can use this method to implement keep alive message interval
 - **TcpKeepAlive**: you can use this method to tell whether to send keep alive message
 - **UseKeychain**: (macos only) used to tell whether to use keychain to decrypt ssh keys
 - **User**: you can use this method to resolve the user to use to log in as
+
+`HostParams::remote_forward` is a vector because OpenSSH permits multiple forwarding directives. A `RemoteForward` with
+no destination represents SOCKS proxy mode; otherwise its destination identifies the local host and port or Unix socket.
 
 ### Missing features
 
@@ -87,7 +91,7 @@ First of all, add ssh2-config to your dependencies
 
 ```toml
 [dependencies]
-ssh2-config = "^0.5"
+ssh2-config = "0.8"
 ```
 
 then parse the configuration
