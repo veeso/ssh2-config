@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_should_apply_append() {
-        let mut algo1 = Algorithms::new(&["aes128-ctr", "aes192-ctr"]);
+        let mut algo1 = Algorithms::new(["aes128-ctr", "aes192-ctr"]);
         let algo2 = AlgorithmsRule::from_str("+aes256-ctr").expect("failed to parse");
         algo1.apply(algo2);
         assert_eq!(
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_should_merge_head() {
-        let mut algo1 = Algorithms::new(&["aes128-ctr", "aes192-ctr"]);
+        let mut algo1 = Algorithms::new(["aes128-ctr", "aes192-ctr"]);
         let algo2 = AlgorithmsRule::from_str("^aes256-ctr").expect("failed to parse");
         algo1.apply(algo2);
         assert_eq!(
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_should_apply_head() {
-        let mut algo1 = Algorithms::new(&["aes128-ctr", "aes192-ctr"]);
+        let mut algo1 = Algorithms::new(["aes128-ctr", "aes192-ctr"]);
         let algo2 = AlgorithmsRule::from_str("^aes256-ctr").expect("failed to parse");
         algo1.apply(algo2);
         assert_eq!(
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_should_merge_exclude() {
-        let mut algo1 = Algorithms::new(&["aes128-ctr", "aes192-ctr", "aes256-ctr"]);
+        let mut algo1 = Algorithms::new(["aes128-ctr", "aes192-ctr", "aes256-ctr"]);
         let algo2 = AlgorithmsRule::from_str("-aes192-ctr").expect("failed to parse");
         algo1.apply(algo2);
         assert_eq!(
@@ -345,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_should_merge_set() {
-        let mut algo1 = Algorithms::new(&["aes128-ctr", "aes192-ctr"]);
+        let mut algo1 = Algorithms::new(["aes128-ctr", "aes192-ctr"]);
         let algo2 = AlgorithmsRule::from_str("aes256-ctr").expect("failed to parse");
         algo1.apply(algo2);
         assert_eq!(algo1.algorithms(), vec!["aes256-ctr".to_string()]);
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn test_should_not_apply_twice() {
-        let mut algo1 = Algorithms::new(&["aes128-ctr", "aes192-ctr"]);
+        let mut algo1 = Algorithms::new(["aes128-ctr", "aes192-ctr"]);
         let algo2 = AlgorithmsRule::from_str("aes256-ctr").expect("failed to parse");
         algo1.apply(algo2);
         assert_eq!(algo1.algorithms(), vec!["aes256-ctr".to_string(),]);
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_algorithms_display_with_rule() {
-        let mut algos = Algorithms::new(&["aes128-ctr"]);
+        let mut algos = Algorithms::new(["aes128-ctr"]);
 
         // Apply append rule
         let rule = AlgorithmsRule::from_str("+aes256-ctr").expect("failed to parse");
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_algorithms_display_without_rule() {
-        let algos = Algorithms::new(&["aes128-ctr", "aes256-ctr"]);
+        let algos = Algorithms::new(["aes128-ctr", "aes256-ctr"]);
         let display = algos.to_string();
         assert_eq!(display, "aes128-ctr,aes256-ctr");
     }
@@ -401,10 +401,10 @@ mod tests {
 
     #[test]
     fn test_algorithms_is_default() {
-        let algos = Algorithms::new(&["aes128-ctr"]);
+        let algos = Algorithms::new(["aes128-ctr"]);
         assert!(algos.is_default());
 
-        let mut algos2 = Algorithms::new(&["aes128-ctr"]);
+        let mut algos2 = Algorithms::new(["aes128-ctr"]);
         algos2.apply(AlgorithmsRule::from_str("aes256-ctr").expect("failed to parse"));
         assert!(!algos2.is_default());
     }
@@ -417,7 +417,7 @@ mod tests {
 
     #[test]
     fn test_append_with_duplicate_algorithms() {
-        let mut algos = Algorithms::new(&["aes128-ctr", "aes256-ctr"]);
+        let mut algos = Algorithms::new(["aes128-ctr", "aes256-ctr"]);
         let rule = AlgorithmsRule::from_str("+aes128-ctr,aes512-ctr").expect("failed to parse");
         algos.apply(rule);
         // aes128-ctr should not be duplicated
@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn test_exclude_all_algorithms() {
-        let mut algos = Algorithms::new(&["aes128-ctr", "aes256-ctr"]);
+        let mut algos = Algorithms::new(["aes128-ctr", "aes256-ctr"]);
         let rule = AlgorithmsRule::from_str("-aes128-ctr,aes256-ctr").expect("failed to parse");
         algos.apply(rule);
         assert!(algos.algorithms().is_empty());

@@ -97,13 +97,17 @@ ssh2-config = "0.8"
 then parse the configuration
 
 ```rust
-use ssh2_config::{ParseRule, SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 
+use ssh2_config::{ParseRule, SshConfig};
+
 fn main() {
-    let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-    let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
+    let mut reader =
+        BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+    let config = SshConfig::default()
+        .parse(&mut reader, ParseRule::STRICT)
+        .expect("Failed to parse configuration");
 
     // Query attributes for a certain host
     let params = config.query("192.168.1.2");
@@ -114,7 +118,7 @@ then you can use the parsed parameters to configure the session:
 
 ```rust
 use ssh2::Session;
-use ssh2_config::{HostParams};
+use ssh2_config::HostParams;
 
 fn configure_session(session: &mut Session, params: &HostParams) {
     if let Some(compress) = params.compression {
@@ -173,7 +177,7 @@ fn auth_with_rsakey(
     session: &mut Session,
     params: &HostParams,
     username: &str,
-    password: Option<&str>
+    password: Option<&str>,
 ) {
     for identity_file in params.identity_file.unwrap_or_default().iter() {
         if let Ok(_) = session.userauth_pubkey_file(username, None, identity_file, password) {
@@ -181,7 +185,6 @@ fn auth_with_rsakey(
         }
     }
 }
-
 ```
 
 ### Reading unsupported fields
@@ -192,13 +195,17 @@ If you require these fields you may still access them through the `unsupported_f
 structure like this:
 
 ```rust
-use ssh2_config::{ParseRule, SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 
+use ssh2_config::{ParseRule, SshConfig};
+
 fn main() {
-    let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-    let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
+    let mut reader =
+        BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+    let config = SshConfig::default()
+        .parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS)
+        .expect("Failed to parse configuration");
 
     // Query attributes for a certain host
     let params = config.query("192.168.1.2");

@@ -134,8 +134,10 @@ fn configure_session(session: &mut Session, params: &HostParams) {
         println!("compression: {}", compress);
         session.set_compress(compress);
     }
-    if params.tcp_keep_alive.unwrap_or(false) && params.server_alive_interval.is_some() {
-        let interval = params.server_alive_interval.unwrap().as_secs() as u32;
+    if params.tcp_keep_alive.unwrap_or(false)
+        && let Some(interval) = params.server_alive_interval
+    {
+        let interval = interval.as_secs() as u32;
         println!("keepalive interval: {} seconds", interval);
         session.set_keepalive(true, interval);
     }

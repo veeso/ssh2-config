@@ -105,5 +105,5 @@ In addition to the process described for the PRs, I've also decided to introduce
 
 ---
 
-Thank you for any contribution!  
+Thank you for any contribution!\
 Christian Visintin
