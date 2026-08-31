@@ -1,6 +1,7 @@
 # Changelog
 
 - [Changelog](#changelog)
+  - [0.8.0](#080)
   - [0.7.2](#072)
     - [Fixed](#fixed)
   - [0.7.1](#071)
@@ -30,6 +31,24 @@
   - [0.1.0](#010)
 
 ---
+
+## 0.8.0
+
+Released on 2026-08-31
+
+### ⚠ Breaking Changes
+
+- **api:** support complete remote forward specifications
+  > `HostParams::remote_forward` changes from `Option<u16>` to
+  > `Vec<RemoteForward>` and preserves listener and destination endpoints.
+
+### Added
+
+- 💥 **api:** support complete remote forward specifications
+
+### Miscellaneous
+
+- **README.md:** update ci badge url
 
 ## 0.7.2
 

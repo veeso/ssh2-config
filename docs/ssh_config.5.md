@@ -224,7 +224,9 @@ socket path.
 
 ### RemoteForward
 
-Forward TCP port or Unix-domain socket on remote machine. Supports SOCKS proxy mode.
+Forward a TCP port or Unix-domain socket on the remote machine. The first argument is a listener in the form
+`[bind_address:]port` or a Unix-domain socket path. An optional second argument selects a `host:hostport` or Unix-domain
+socket destination; omitting it enables SOCKS proxy mode. Multiple directives are preserved in configuration order.
 
 ### DynamicForward
 

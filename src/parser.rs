@@ -13,8 +13,8 @@ use glob::glob;
 use thiserror::Error;
 
 use super::{Host, HostClause, HostParams, SshConfig};
-use crate::DefaultAlgorithms;
 use crate::params::AlgorithmsRule;
+use crate::{DefaultAlgorithms, RemoteForward, RemoteForwardDestination, RemoteForwardListen};
 
 // modules
 mod field;
@@ -50,6 +50,9 @@ pub enum SshParserError {
     Glob(#[from] glob::GlobError),
     #[error("invalid quotes")]
     InvalidQuotes,
+    /// The `RemoteForward` arguments do not match an OpenSSH forwarding form.
+    #[error("invalid RemoteForward arguments: {0:?}")]
+    InvalidRemoteForward(Vec<String>),
     #[error("missing argument")]
     MissingArgument,
     #[error("pattern error: {0}")]
@@ -435,9 +438,9 @@ impl SshConfigParser {
                 params.pubkey_authentication = Some(value);
             }
             Field::RemoteForward => {
-                let value = Self::parse_port(args)?;
+                let value = Self::parse_remote_forward(args)?;
                 trace!("remote_forward: {value}",);
-                params.remote_forward = Some(value);
+                params.remote_forward.push(value);
             }
             Field::ServerAliveInterval => {
                 let value = Self::parse_duration(args)?;
@@ -768,6 +771,76 @@ impl SshConfigParser {
         }
     }
 
+    /// Parse a complete remote forwarding specification.
+    fn parse_remote_forward(args: Vec<String>) -> SshParserResult<RemoteForward> {
+        if !(1..=2).contains(&args.len()) {
+            return Err(SshParserError::InvalidRemoteForward(args));
+        }
+
+        let listen_argument = Self::normalize_forward_argument(&args[0]);
+        let listen = if listen_argument.contains('/') {
+            RemoteForwardListen::UnixSocket(PathBuf::from(listen_argument))
+        } else if let Ok(port) = u16::from_str(&listen_argument) {
+            RemoteForwardListen::Port(port)
+        } else if let Some((host, port)) = Self::parse_forward_host(&listen_argument, true) {
+            RemoteForwardListen::Host { host, port }
+        } else {
+            return Err(SshParserError::InvalidRemoteForward(args));
+        };
+
+        let destination = if let Some(argument) = args.get(1) {
+            let argument = Self::normalize_forward_argument(argument);
+            if argument.contains('/') {
+                Some(RemoteForwardDestination::UnixSocket(PathBuf::from(
+                    argument,
+                )))
+            } else if let Some((host, port)) = Self::parse_forward_host(&argument, false) {
+                Some(RemoteForwardDestination::Host { host, port })
+            } else {
+                return Err(SshParserError::InvalidRemoteForward(args));
+            }
+        } else {
+            None
+        };
+
+        Ok(RemoteForward::new(listen, destination))
+    }
+
+    /// Remove optional quotes and supported escapes from a forwarding argument.
+    fn normalize_forward_argument(argument: &str) -> String {
+        if argument.starts_with('"')
+            && argument.len() >= 2
+            && Self::ends_with_unescaped_quote(argument)
+        {
+            Self::unescape_string(&argument[1..argument.len() - 1])
+        } else {
+            argument.to_string()
+        }
+    }
+
+    /// Parse an OpenSSH host and port pair.
+    fn parse_forward_host(value: &str, allow_empty_host: bool) -> Option<(String, u16)> {
+        let (host, port) = if let Some(value) = value.strip_prefix('[') {
+            let (host, port) = value.split_once("]:")?;
+            if host.is_empty() || host.contains(['[', ']']) {
+                return None;
+            }
+            (host, port)
+        } else {
+            let (host, port) = value.rsplit_once(':')?;
+            if host.contains([':', '[', ']']) {
+                return None;
+            }
+            (host, port)
+        };
+
+        if !allow_empty_host && host.is_empty() {
+            return None;
+        }
+
+        Some((host.to_string(), u16::from_str(port).ok()?))
+    }
+
     /// Parse string argument
     fn parse_string(args: Vec<String>) -> SshParserResult<String> {
         if let Some(s) = args.into_iter().next() {
@@ -792,13 +865,146 @@ mod tests {
 
     use std::fs::File;
     use std::io::{BufReader, Write};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use pretty_assertions::assert_eq;
     use tempfile::NamedTempFile;
 
     use super::*;
-    use crate::DefaultAlgorithms;
+    use crate::{DefaultAlgorithms, RemoteForward, RemoteForwardDestination, RemoteForwardListen};
+
+    #[test]
+    fn should_parse_remote_forward_listeners() -> Result<(), SshParserError> {
+        let cases = [
+            (
+                vec!["8080"],
+                RemoteForward::new(RemoteForwardListen::Port(8080), None),
+            ),
+            (
+                vec!["localhost:8080"],
+                RemoteForward::new(
+                    RemoteForwardListen::Host {
+                        host: "localhost".to_string(),
+                        port: 8080,
+                    },
+                    None,
+                ),
+            ),
+            (
+                vec!["0.0.0.0:8080"],
+                RemoteForward::new(
+                    RemoteForwardListen::Host {
+                        host: "0.0.0.0".to_string(),
+                        port: 8080,
+                    },
+                    None,
+                ),
+            ),
+            (
+                vec!["*:8080"],
+                RemoteForward::new(
+                    RemoteForwardListen::Host {
+                        host: "*".to_string(),
+                        port: 8080,
+                    },
+                    None,
+                ),
+            ),
+            (
+                vec![":8080"],
+                RemoteForward::new(
+                    RemoteForwardListen::Host {
+                        host: String::new(),
+                        port: 8080,
+                    },
+                    None,
+                ),
+            ),
+            (
+                vec!["[::1]:8080"],
+                RemoteForward::new(
+                    RemoteForwardListen::Host {
+                        host: "::1".to_string(),
+                        port: 8080,
+                    },
+                    None,
+                ),
+            ),
+            (
+                vec!["/tmp/remote.sock"],
+                RemoteForward::new(
+                    RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote.sock")),
+                    None,
+                ),
+            ),
+        ];
+
+        for (args, expected) in cases {
+            let args = args.into_iter().map(str::to_string).collect();
+            assert_eq!(SshConfigParser::parse_remote_forward(args)?, expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn should_parse_remote_forward_destinations() -> Result<(), SshParserError> {
+        let cases = [
+            (
+                vec!["8080", "localhost:80"],
+                RemoteForward::new(
+                    RemoteForwardListen::Port(8080),
+                    Some(RemoteForwardDestination::Host {
+                        host: "localhost".to_string(),
+                        port: 80,
+                    }),
+                ),
+            ),
+            (
+                vec!["/tmp/remote.sock", "/tmp/local.sock"],
+                RemoteForward::new(
+                    RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote.sock")),
+                    Some(RemoteForwardDestination::UnixSocket(PathBuf::from(
+                        "/tmp/local.sock",
+                    ))),
+                ),
+            ),
+            (
+                vec!["\"/tmp/remote socket\"", "[2001:db8::1]:443"],
+                RemoteForward::new(
+                    RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote socket")),
+                    Some(RemoteForwardDestination::Host {
+                        host: "2001:db8::1".to_string(),
+                        port: 443,
+                    }),
+                ),
+            ),
+        ];
+
+        for (args, expected) in cases {
+            let args = args.into_iter().map(str::to_string).collect();
+            assert_eq!(SshConfigParser::parse_remote_forward(args)?, expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn should_reject_invalid_remote_forward() {
+        for args in [
+            vec![],
+            vec!["localhost"],
+            vec!["[::1:8080"],
+            vec!["70000"],
+            vec!["localhost:70000"],
+            vec!["8080", "80"],
+            vec!["8080", "localhost:80", "unexpected"],
+        ] {
+            let args = args.into_iter().map(str::to_string).collect();
+            assert!(matches!(
+                SshConfigParser::parse_remote_forward(args),
+                Err(SshParserError::InvalidRemoteForward(_))
+            ));
+        }
+    }
 
     #[test]
     fn should_parse_configuration() -> Result<(), SshParserError> {
@@ -911,7 +1117,10 @@ mod tests {
             Duration::from_secs(60)
         );
         assert_eq!(params_tostapane.tcp_keep_alive.unwrap(), true);
-        assert_eq!(params_tostapane.remote_forward.unwrap(), 88);
+        assert_eq!(
+            params_tostapane.remote_forward,
+            vec![RemoteForward::new(RemoteForwardListen::Port(88), None)]
+        );
         assert_eq!(params_tostapane.user.as_deref().unwrap(), "ciro-esposito");
 
         // all-hosts fallback options
@@ -944,7 +1153,10 @@ mod tests {
 
         // host-specific options
         assert_eq!(params_192_168_1_30.user.as_deref().unwrap(), "nutellaro");
-        assert_eq!(params_192_168_1_30.remote_forward.unwrap(), 123);
+        assert_eq!(
+            params_192_168_1_30.remote_forward,
+            vec![RemoteForward::new(RemoteForwardListen::Port(123), None)]
+        );
 
         // cmdline overrides
         assert_eq!(params_192_168_1_30.compression.unwrap(), true);
@@ -1336,12 +1548,69 @@ mod tests {
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
         SshConfigParser::update_host(
             Field::RemoteForward,
-            vec![String::from("3005")],
+            vec![String::from("3005"), String::from("localhost:80")],
             &mut host,
             ParseRule::ALLOW_UNKNOWN_FIELDS,
             &DefaultAlgorithms::empty(),
         )?;
-        assert_eq!(host.params.remote_forward.unwrap(), 3005);
+        SshConfigParser::update_host(
+            Field::RemoteForward,
+            vec![String::from("/tmp/remote.sock")],
+            &mut host,
+            ParseRule::ALLOW_UNKNOWN_FIELDS,
+            &DefaultAlgorithms::empty(),
+        )?;
+        assert_eq!(
+            host.params.remote_forward,
+            vec![
+                RemoteForward::new(
+                    RemoteForwardListen::Port(3005),
+                    Some(RemoteForwardDestination::Host {
+                        host: "localhost".to_string(),
+                        port: 80,
+                    }),
+                ),
+                RemoteForward::new(
+                    RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote.sock")),
+                    None,
+                ),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_accumulate_remote_forwards_from_matching_hosts() -> Result<(), SshParserError> {
+        let config = r#"
+Host test
+    RemoteForward 8080 localhost:80
+
+Host *
+    RemoteForward "/tmp/remote socket" "/tmp/local socket"
+"#;
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(
+            config.query("test").remote_forward,
+            vec![
+                RemoteForward::new(
+                    RemoteForwardListen::Port(8080),
+                    Some(RemoteForwardDestination::Host {
+                        host: "localhost".to_string(),
+                        port: 80,
+                    }),
+                ),
+                RemoteForward::new(
+                    RemoteForwardListen::UnixSocket(PathBuf::from("/tmp/remote socket")),
+                    Some(RemoteForwardDestination::UnixSocket(PathBuf::from(
+                        "/tmp/local socket",
+                    ))),
+                ),
+            ]
+        );
         Ok(())
     }
 
@@ -2518,7 +2787,10 @@ Host *
             microwave_params.host_name.as_deref().unwrap(),
             "192.168.24.33"
         );
-        assert_eq!(microwave_params.remote_forward.unwrap(), 88);
+        assert_eq!(
+            microwave_params.remote_forward,
+            vec![RemoteForward::new(RemoteForwardListen::Port(88), None)]
+        );
         assert_eq!(microwave_params.compression.unwrap(), true);
 
         // verify included host (fridge)

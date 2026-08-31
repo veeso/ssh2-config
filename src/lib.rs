@@ -25,8 +25,16 @@
 //! First of you need to add **ssh2-config** to your project dependencies:
 //!
 //! ```toml
-//! ssh2-config = "^0.6"
+//! ssh2-config = "0.8"
 //! ```
+//!
+//! ## Feature flags
+//!
+//! | name              | description                                               | default |
+//! | ----------------- | --------------------------------------------------------- | ------- |
+//! | `default`         | Enable the default feature set, which is currently empty. | ✔       |
+//! | `nolog`           | Disable logging at compile time.                          |         |
+//! | `reload-ssh-algo` | Regenerate default algorithms from OpenSSH source.        |         |
 //!
 //! ## Example
 //!
@@ -135,7 +143,10 @@ pub use self::default_algorithms::{
     DefaultAlgorithms, default_algorithms as default_openssh_algorithms,
 };
 pub use self::host::{Host, HostClause};
-pub use self::params::{Algorithms, HostParams};
+#[doc(inline)]
+pub use self::params::{
+    Algorithms, HostParams, RemoteForward, RemoteForwardDestination, RemoteForwardListen,
+};
 pub use self::parser::{ParseRule, SshParserError, SshParserResult};
 
 /// Describes the ssh configuration.
