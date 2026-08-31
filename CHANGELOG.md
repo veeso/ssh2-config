@@ -192,18 +192,18 @@ Released on 19/12/2024
   Otherwise you can now access unsupported fields by using the `unsupported_fields` field on the `HostParams` structure
   like this:
 
-    ```rust
-    use ssh2_config::{ParseRule, SshConfig};
-    use std::fs::File;
-    use std::io::BufReader;
+  ```rust
+  use ssh2_config::{ParseRule, SshConfig};
+  use std::fs::File;
+  use std::io::BufReader;
 
-    let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-    let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
+  let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
+  let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
 
-    // Query attributes for a certain host
-    let params = config.query("192.168.1.2");
-    let forwards = params.unsupported_fields.get("dynamicforward");
-    ```
+  // Query attributes for a certain host
+  let params = config.query("192.168.1.2");
+  let forwards = params.unsupported_fields.get("dynamicforward");
+  ```
 
 ## 0.2.3
 

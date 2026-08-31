@@ -1,79 +1,96 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this
+repository.
 
-## Project Overview
+`AGENTS.md` is a symbolic link to this file so every coding agent uses the same
+repository contract.
 
-ssh2-config is a Rust library that parses OpenSSH configuration files for use with the ssh2-rs crate.
-It implements the first-value-wins rule per the SSH specification.
+## Commands
 
-## Build and Test Commands
+Every recurring task runs through a [`just`](https://just.systems) recipe. Do
+not bypass a recipe with an ad hoc Cargo or tool command. If a recurring task
+has no recipe, add one under `just/` before using it. Run `just` to list all
+recipes.
 
-```bash
-# Build
-cargo build
-
-# Run all tests
-cargo test
-
-# Run specific test
-cargo test test_name
-
-# Clippy (must pass with no warnings)
-cargo clippy -- -Dwarnings
-
-# Format (requires nightly)
-cargo +nightly fmt --all --check   # check only
-cargo +nightly fmt                  # apply formatting
-
-# Run examples
-cargo run --example query -- <host> [config-path]
-cargo run --example print -- [config-path]
-cargo run --example client -- <host> [config-path]
-
-# Regenerate default algorithms from OpenSSH source
-cargo build --features reload-ssh-algo
+```sh
+just build                         # Build all targets.
+just release                       # Build all targets in release mode.
+just test                          # Run target and documentation tests.
+just coverage                      # Write LCOV coverage to lcov.info.
+just fmt                           # Format Markdown, Rust, TOML, and YAML.
+just fmt_check                     # Check formatting without changes.
+just lint "-- -D warnings"         # Run Clippy and deny warnings.
+just doc                           # Build documentation and deny warnings.
+just deny                          # Audit dependencies with cargo-deny.
+just scan_secrets                  # Scan the repository with TruffleHog.
+just check_default_algorithms      # Verify generated OpenSSH algorithms.
+just check                         # Run the complete local quality gate.
+just changelog_preview 0.8.0       # Preview an unreleased changelog.
+just changelog 0.8.0               # Generate CHANGELOG.md.
+just publish "--dry-run --allow-dirty"
 ```
 
-**Test environment setup:** Tests require `~/.ssh/config` to exist (can be empty).
+Tests that parse the default user configuration require `~/.ssh/config` to
+exist; it may be empty.
+
+To run one test, pass its filter through the recipe:
+
+```sh
+just test "parse_remote_forward"
+just test "-- --nocapture"
+```
+
+Never request build or test parallelism above eight from the command line. This
+is an invocation constraint only; do not encode the cap in tracked files.
+
+If a required tool is missing, report it. Never claim a check passed or replace
+it silently with a weaker command.
 
 ## Architecture
 
-### Core Types
+`ssh2-config` is a library crate that parses OpenSSH client configuration for
+the `ssh2` crate. It applies OpenSSH's first-obtained-value rule while combining
+global directives and matching `Host` blocks.
 
-- **SshConfig** (`lib.rs`): Main entry point. Parses config via `parse()`, queries hosts via `query(pattern)`,
-  serializes via `to_string()`
-- **HostParams** (`params.rs`): All configuration parameters for a host (port, user, identity files, algorithms, etc.)
-- **Host** (`host.rs`): Pattern-based host matching with wildcard (`*`, `?`) and negation (`!`) support
-- **Algorithms** (`params/algos.rs`): Algorithm list with modification rules (Set, Append `+`, Exclude `-`, Head `^`)
+- `src/lib.rs` exposes `SshConfig`, the main parse, query, and serialization
+  API.
+- `src/parser.rs` and `src/parser/field.rs` tokenize directives, resolve
+  includes, and populate host parameters.
+- `src/params.rs` and `src/params/` define supported SSH options and algorithm
+  list operations.
+- `src/host.rs` implements wildcard and negated host matching.
+- `src/serializer.rs` writes parsed configurations back to OpenSSH syntax.
+- `build/` regenerates `src/default_algorithms/openssh.rs` from a pinned
+  OpenSSH source tag when the `reload-ssh-algo` feature is enabled.
 
-### Parsing Flow
+The `reload-ssh-algo` feature is intentionally excluded from general lint and
+documentation recipes: enabling it clones OpenSSH and rewrites generated
+source. Use `just check_default_algorithms` for that path.
 
-1. Parser reads config top-down, applying first-value-wins rule
-2. `Include` directives are resolved recursively with glob support
-3. Algorithm fields accumulate modifications (append/exclude/head) applied to defaults
-4. `query()` merges matching Host blocks via `HostParams::overwrite_if_none()`
+## Tooling
 
-### Key Files
+- `Justfile` imports grouped recipes from `just/`.
+- `dprint.json` formats Markdown, TOML, and YAML directly and delegates Rust
+  files to nightly rustfmt.
+- `cliff.toml` generates `CHANGELOG.md` from Conventional Commits.
+- `deny.toml` enforces advisory, license, duplicate, wildcard, and source
+  policy for every feature.
+- `.github/workflows/ci.yml` drives build and quality jobs through `just`.
+- Dedicated workflows audit GitHub Actions with zizmor and scan secrets with
+  TruffleHog.
 
-- `src/parser.rs` + `src/parser/field.rs`: Tokenization and field parsing
-- `src/default_algorithms/openssh.rs`: Build-time generated algorithm defaults
-- `build/main.rs`: Build script that can regenerate algorithms from OpenSSH source
+## Conventions
 
-### ParseRule Flags
-
-- `STRICT`: Reject unknown/unsupported fields
-- `ALLOW_UNKNOWN_FIELDS`: Accept completely unknown fields
-- `ALLOW_UNSUPPORTED_FIELDS`: Accept recognized but unsupported fields (accessible via `params.unsupported_fields`)
-
-## Code Style
-
-- Follow Conventional Commits: `type(scope): message`
-- Minimize dependencies
-- Write tests for new features
-- Clippy must pass with `-Dwarnings`
-- Format with nightly rustfmt
-
-## Reference Documentation
-
-- `docs/ssh_config.5.md`: OpenSSH ssh_config(5) man page reference for all supported configuration options
+- Use `module_name.rs`; never add `mod.rs`.
+- Public library items require canonical rustdoc and runnable examples.
+- Use named format placeholders instead of positional `{}` placeholders.
+- Prefer `#[expect]` with a reason over `#[allow]`.
+- Keep Cargo dependencies and features alphabetically sorted and use minimal,
+  bare versions.
+- Follow Conventional Commits with imperative, lower-case subjects. Do not add
+  agent attribution, session links, or agent `Co-Authored-By` lines.
+- After changing a Markdown file containing a table, run
+  `fmt-md-tables -i <file>`.
+- After changing `.github/workflows/`, run `zizmor .github/workflows` until it
+  exits cleanly.

@@ -8,12 +8,12 @@ documentation = "https://docs.rs/ssh2-config"
 edition = "2024"
 homepage = "https://veeso.github.io/ssh2-config/"
 include = [
-    "build/**/*",
-    "examples/**/*",
-    "src/**/*",
-    "LICENSE",
-    "README.md",
-    "CHANGELOG.md",
+  "build/**/*",
+  "examples/**/*",
+  "src/**/*",
+  "LICENSE",
+  "README.md",
+  "CHANGELOG.md",
 ]
 keywords = ["ssh2", "ssh", "ssh-config", "ssh-config-parser"]
 license = "MIT"
@@ -46,9 +46,7 @@ tempfile = "3"
 
 [build-dependencies]
 anyhow = { version = "1", optional = true }
-git2 = { version = "0.21", default-features = false, features = [
-    "https",
-], optional = true }
+git2 = { version = "0.21", default-features = false, features = ["https"], optional = true }
 
 [[example]]
 name = "client"
