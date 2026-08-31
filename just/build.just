@@ -8,6 +8,10 @@ build args="":
 release args="":
   cargo build --all-targets --release {{ args }}
 
+[group('build')]
+reload_ssh_algos:
+  cargo build --features reload-ssh-algo
+
 # Remove Cargo build artifacts.
 [group('build')]
 [confirm("Are you sure you want to clean the build artifacts?")]

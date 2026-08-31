@@ -6,7 +6,7 @@ build = "build/main.rs"
 categories = ["network-programming"]
 documentation = "https://docs.rs/ssh2-config"
 edition = "2024"
-homepage = "https://veeso.github.io/ssh2-config/"
+homepage = "https://github.com/veeso/ssh2-config"
 include = [
   "build/**/*",
   "examples/**/*",

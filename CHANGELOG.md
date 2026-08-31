@@ -1,277 +1,358 @@
 # Changelog
 
-- [Changelog](#changelog)
-  - [0.8.0](#080)
-  - [0.7.2](#072)
-    - [Fixed](#fixed)
-  - [0.7.1](#071)
-    - [Fixed](#fixed-1)
-  - [0.7.0](#070)
-  - [0.6.5](#065)
-  - [0.6.4](#064)
-  - [0.6.3](#063)
-  - [0.6.2](#062)
-  - [0.6.1](#061)
-  - [0.6.0](#060)
-  - [0.5.4](#054)
-  - [0.5.1](#051)
-  - [0.5.0](#050)
-  - [0.4.0](#040)
-  - [0.3.0](#030)
-  - [0.2.3](#023)
-  - [0.2.2](#022)
-  - [0.2.1](#021)
-  - [0.2.0](#020)
-  - [0.1.6](#016)
-  - [0.1.5](#015)
-  - [0.1.4](#014)
-  - [0.1.3](#013)
-  - [0.1.2](#012)
-  - [0.1.1](#011)
-  - [0.1.0](#010)
-
----
+All notable changes to this project are documented in this file.
 
 ## 0.8.0
 
 Released on 2026-08-31
 
-### ⚠ Breaking Changes
+### Breaking changes
 
 - **api:** support complete remote forward specifications
-  > `HostParams::remote_forward` changes from `Option<u16>` to
-  > `Vec<RemoteForward>` and preserves listener and destination endpoints.
+
+> HostParams::remote_forward changes from Option<u16> to Vec<RemoteForward> and preserves listener and destination endpoints.
 
 ### Added
 
-- 💥 **api:** support complete remote forward specifications
+- Breaking: **api:** support complete remote forward specifications
 
-### Miscellaneous
+### Build
 
-- **README.md:** update ci badge url
+- modernize project tooling
 
 ## 0.7.2
 
 Released on 2026-08-01
 
-### Fixed
+### Build
 
-- gate build deps behind reload-ssh-algo feature
-  > Replace RELOAD_SSH_ALGO env var with optional cargo feature. Makes
-  > anyhow and git2 (and openssl C bindings) optional build dependencies,
-  > only compiled when the feature is enabled.
+- **cargo.toml:** add tls backend to git2
 
 ## 0.7.1
 
 Released on 2026-04-26
 
+### Added
+
+- **build:** gate build deps behind reload-ssh-algo feature
+
+> Replace RELOAD_SSH_ALGO env var with optional cargo feature. Makes
+> anyhow and git2 (and openssl C bindings) optional build dependencies,
+> only compiled when the feature is enabled.
+
 ### Fixed
 
 - **parser:** preserve quoted spans with whitespace across multiple args (#52)
-  > Previously, tokenize_line only handled a single fully-quoted argument; multi-argument
-  > lines split on whitespace and broke quoted values containing spaces (e.g. SetEnv
-  > TEST="Test 2"). Introduce split_args_respecting_quotes to walk chars with quote-state,
-  > keeping quoted spans intact and preserving backslash escapes verbatim. Single fully-
-  > quoted args continue to be stripped and unescaped for backward compatibility.
+
+> Previously, tokenize_line only handled a single fully-quoted argument; multi-argument
+> lines split on whitespace and broke quoted values containing spaces (e.g. SetEnv
+> TEST="Test 2"). Introduce split_args_respecting_quotes to walk chars with quote-state,
+> keeping quoted spans intact and preserving backslash escapes verbatim. Single fully-
+> quoted args continue to be stripped and unescaped for backward compatibility.
 
 ## 0.7.0
 
-Released on 31/01/2026
+Released on 2026-01-31
 
-- **BREAKING CHANGE**: Added `InvalidQuotes` variant to `SshParserError` enum
-- Multiple `IdentityFile` directives are now accumulated instead of following first-value-wins rule, matching OpenSSH
-  behavior.
-- [Issue 43](https://github.com/veeso/ssh2-config/issues/43): Parser now correctly preserves `#` characters inside
-  quoted strings instead of treating them as comments.
-- [Issue 45](https://github.com/veeso/ssh2-config/issues/45): Parser now returns an error for mismatched quotes instead
-  of silently ignoring them.
-- [Issue 44](https://github.com/veeso/ssh2-config/issues/44): Parser now handles escape sequences (`\"`, `\\`, `\'`)
-  within quoted arguments.
-- [Issue 46](https://github.com/veeso/ssh2-config/issues/46): Fixed pattern parsing to handle multiple `!` characters
-  correctly. Only a leading `!` indicates negation; subsequent `!` characters are treated as literal.
+### Fixed
+
+- **parser:** accumulate IdentityFile directives across Host blocks (#39) (#42)
+
+> Multiple IdentityFile directives are now accumulated instead of
+> following the first-value-wins rule, matching OpenSSH behavior where
+> "Multiple IdentityFile directives will add to the list of identities
+> tried".
+
+- **parser:** preserve hash characters inside quoted strings (#43) (#47)
+
+> The parser now correctly handles `#` characters inside quoted strings,
+> treating them as part of the value rather than as comment markers.
+
+- **parser:** return error for mismatched quotes (#45) (#48)
+
+> - fix(parser): return error for mismatched quotes (#45)
+>
+> The parser now validates quotes in arguments and returns an InvalidQuotes
+> error when they are mismatched, matching OpenSSH behavior.
+
+- **parser:** handle escape sequences in quoted arguments (#44) (#49)
+
+> Added support for escape sequences within quoted strings:
+>
+> - \" -> " (escaped double quote)
+> - \\ -> \ (escaped backslash)
+> - \' -> ' (escaped single quote)
+>
+> Unrecognized escape sequences preserve the backslash, matching
+> OpenSSH's argv_split() behavior.
+
+- **parser:** handle multiple '!' characters in host patterns correctly (#46) (#50)
+
+> Only the leading '!' character indicates a negated pattern. Any subsequent
+> '!' characters are now treated as literal characters in the pattern.
 
 ## 0.6.5
 
-Released on 14/01/2026
+Released on 2026-01-14
 
-- [Issue 37](https://github.com/veeso/ssh2-config/issues/37): KEX Algorithms were invalidly extracted
-  - Also removed duplicated and invalid algorithms from the default list.
+### Fixed
 
-## 0.6.4
+- **build:** KEX Algorithms were invalidly extracted (#38)
 
-Released on 13/01/2026
-
-- Auto generate default supported algorithms documentation on build
+> Also removed duplicated and invalid algorithms from the default list
 
 ## 0.6.3
 
-Released on 13/01/2026
+Released on 2026-01-13
 
-- [Issue 32](https://github.com/veeso/ssh2-config/issues/32): Added missing field to serializer:
-  - `AddKeysToAgent`
-  - `ForwardAgent`
-  - `ProxyJump`
-- [Issue 33](https://github.com/veeso/ssh2-config/issues/33): Parse `~` in include paths.
-- [Issue 34](https://github.com/veeso/ssh2-config/issues/34): Fix parsing of multiple algos on the same row.
-- Updated default algos to `V_10_2_P1`
+### Fixed
+
+- **build:** default algos not being split by `,` (#35)
+
+> - fix(build): default algos not being split by `,`
+>
+> Also updated default algos to openssh `V_10_2_P1`
+
+- include path handling for path start with `~` (#36)
+
+> If the path starts with '~', it now strips the prefix and prepends the home directory. This ensures correct path formation for SSH configurations.
+>
+> ---
+
+- Serialise some missing fields (#32)
+
+> Add AddKeysToAgent, ForwardAgent and ProxyJump to
+> the serialiser.
 
 ## 0.6.2
 
-Released on 25/09/2025
+Released on 2025-09-25
 
-- fix: Identify the root/default host when serialising (#27)
-- fix: Combine host declarations when serialising (#28)
-- fix: Add AddKeysToAgent, ForwardAgent, ProxyJump fields (#29)
+### Fixed
 
-Developed by [@milliams](https://github.com/milliams)
+- Identify the root/default host when serialising (#27)
+
+> The first host in the list will only be treated as
+> the root host if its host pattern is exactly "*",
+> otherwise it will be treated as a normal host.
+
+- Combine host declarations when serialising (#28)
+
+> - fix: Combine host declarations when serialising
+>
+> Where multiple patterns are assigned to a host,
+> put them all in the same Host declaration rather
+> than printing the host parameters multiple times.
+>
+> - style: Remove unnecessary blank line in tests module
+
+- Add AddKeysToAgent, ForwardAgent, ProxyJump fields (#29)
+
+> - feat: Add support for AddKeysToAgent keyword
+> - feat: Add support for ForwardAgent keyword
+> - feat: Add support for ProxyJump keyword
 
 ## 0.6.1
 
-Released on 25/09/2025
+Released on 2025-09-25
 
-- [Issue 30](https://github.com/veeso/ssh2-config/issues/30): Host blocks from included files didn't get registered.
-  Fixed that.
+### Fixed
+
+- Host blocks from included files didn't get registered (#31)
+
+> - fix: Host blocks from included files didn't get registered
+
+### Build
+
+- MRSV 1.88.0
 
 ## 0.6.0
 
-Released on 15/08/2025
+Released on 2025-08-15
+
+### Added
 
 - Added a new constructor `SshConfig::from_hosts()` to build a `SshConfig` from a list of `Host`.
-- If `Include` directive contains a relative path, it must be resolved to `$HOME/.ssh/${PATH}`
+
+### Fixed
+
+- **parser:** If `Include` directive contains a relative path, it must be resolved to `$HOME/.ssh/${PATH}`
 - Updated ssh default algos to `V_10_0_P2`
+
+### Style
+
+- Lint
 
 ## 0.5.4
 
-Released on 27/03/2025
+Released on 2025-03-27
 
-- on docsrs DON'T build algos. It's not allowed by docs.rs
-- added `RELOAD_SSH_ALGO` env variable to rebuild algos.
+### Fixed
+
+- build for DOCS_RS.
+
+### Build
+
+- include openssh algos; rebuild only if env set
 
 ## 0.5.1
 
-Released on 27/03/2025
+Released on 2025-03-27
 
-- build was not included in the package. Fixed that.
+### Breaking changes
 
-## 0.5.0
+- added Algorithms variant to handle correctly algo rules; parse top-down, allow multi hosts (#23)
 
-Released on 27/03/2025
+> changed the API to get algorithms from Option of Vec String, to Algorithms
 
-- [issue 22](https://github.com/veeso/ssh2-config/issues/22): should parse tokens with `=` and quotes (`"`)
-- [issue 21](https://github.com/veeso/ssh2-config/issues/21): Finally fixed how parameters are applied to host patterns
-- Replaced algorithms `Vec<String>` with `Algorithms` type.
-  - The new type is a variant with `Append`, `Head`, `Exclude` and `Set`.
-  - This allows to **ACTUALLY** handle algorithms correctly.
-  - To pass to ssh options, use `algorithms()` method
-  - Beware that when accessing the internal vec, you MUST care of what it means for that variant.
-- Replaced `HostParams::merge` with `HostParams::overwrite_if_none` to avoid overwriting existing values.
-- Added default Algorithms to the SshConfig structure. See readme for details on how to use it.
+- fix: renamed AlgoType to AlgoOp
+
+- fix: Replaced `HostParams::merge` with `HostParams::overwrite_if_none` to avoid overwriting existing values.
+
+- feat!: Added Default Algorithms to SshConfig
+
+Added default Algorithms to the SshConfig structure. See readme for details on how to use it.
+
+### Added
+
+- Breaking: added Algorithms variant to handle correctly algo rules; parse top-down, allow multi hosts (#23)
+
+> - fix: first definition has priority
+> - fix: don't overwrite first definition of hosts, we keep both
+> - feat!: added Algorithms variant to handle correctly algo rules; parse top-down, allow multi hosts
+
+### Fixed
+
+- parse config entries separated with '=' or quotes (") (#24)
+- include build to manifest
+
+### Performance
+
+- don't fetch openssh repo unless file doesn't exist or is older than a week
 
 ## 0.4.0
 
-Released on 15/03/2025
+Released on 2025-03-15
 
-- Added support for `Include` directive. <https://man.openbsd.org/OpenBSD-current/man5/ssh_config.5#Include>
-- Fixed ordering in appliance of options. **It's always top-bottom**.
-- Added logging to parser. You can now disable logging by using `nolog` feature.
+### Breaking changes
+
+- **parser:** Added support for Include directive; fixed ordering of parser to top-bottom
+
+> Added support for Include directive; fixed ordering of parser to top-bottom
+
+### Added
+
+- Breaking: **parser:** Added support for Include directive; fixed ordering of parser to top-bottom
 - `parse_default_file` is now available to Windows users
-- Added `Display` and `ToString` traits for `SshConfig` which serializes the configuration into ssh2 format
+- ToString and Display for SshConfig
+
+> It is now possible to serialize ssh2 config by using the ToString or Display trait to SshConfig
 
 ## 0.3.0
 
-Released on 19/12/2024
+Released on 2024-12-19
 
-- thiserror `2.0`
-- ‼️ **BREAKING CHANGE**: Added support for unsupported fields:
+### Added
 
-  `AddressFamily, BatchMode, CanonicalDomains, CanonicalizeFallbackLock, CanonicalizeHostname, CanonicalizeMaxDots, CanonicalizePermittedCNAMEs, CheckHostIP, ClearAllForwardings, ControlMaster, ControlPath, ControlPersist, DynamicForward, EnableSSHKeysign, EscapeChar, ExitOnForwardFailure, FingerprintHash, ForkAfterAuthentication, ForwardAgent, ForwardX11, ForwardX11Timeout, ForwardX11Trusted, GatewayPorts, GlobalKnownHostsFile, GSSAPIAuthentication, GSSAPIDelegateCredentials, HashKnownHosts, HostbasedAcceptedAlgorithms, HostbasedAuthentication, HostKeyAlias, HostbasedKeyTypes, IdentitiesOnly, IdentityAgent, Include, IPQoS, KbdInteractiveAuthentication, KbdInteractiveDevices, KnownHostsCommand, LocalCommand, LocalForward, LogLevel, LogVerbose, NoHostAuthenticationForLocalhost, NumberOfPasswordPrompts, PasswordAuthentication, PermitLocalCommand, PermitRemoteOpen, PKCS11Provider, PreferredAuthentications, ProxyCommand, ProxyJump, ProxyUseFdpass, PubkeyAcceptedKeyTypes, RekeyLimit, RequestTTY, RevokedHostKeys, SecruityKeyProvider, SendEnv, ServerAliveCountMax, SessionType, SetEnv, StdinNull, StreamLocalBindMask, StrictHostKeyChecking, SyslogFacility, UpdateHostKeys, UserKnownHostsFile, VerifyHostKeyDNS, VisualHostKey, XAuthLocation`
+- BREAKING Unsupported fields
 
-  If you want to keep the behaviour as-is, use `ParseRule::STRICT | ParseRule::ALLOW_UNSUPPORTED_FIELDS` when calling
-  `parse()` if you were using `ParseRule::STRICT` before.
+> - Update documentation to reflect unsupported_fields field
+> - Add logic for unsupported fields
+> - Add a comment to the unssupported field logic
+> - fix: improvements to code
+> - feat: breaking 0.3
+>
+> ---
 
-  Otherwise you can now access unsupported fields by using the `unsupported_fields` field on the `HostParams` structure
-  like this:
+### Fixed
 
-  ```rust
-  use ssh2_config::{ParseRule, SshConfig};
-  use std::fs::File;
-  use std::io::BufReader;
-
-  let mut reader = BufReader::new(File::open(config_path).expect("Could not open configuration file"));
-  let config = SshConfig::default().parse(&mut reader, ParseRule::ALLOW_UNSUPPORTED_FIELDS).expect("Failed to parse configuration");
-
-  // Query attributes for a certain host
-  let params = config.query("192.168.1.2");
-  let forwards = params.unsupported_fields.get("dynamicforward");
-  ```
+- donation link
+- bump version
 
 ## 0.2.3
 
-Released on 05/12/2023
+Released on 2023-12-05
 
-- Fixed the order of appliance of configuration argument when overriding occurred. Thanks @LeoniePhiline
+### Fixed
 
-## 0.2.2
+- correctly apply configuration precedence in reverse parsing order (#12)
 
-Released on 31/07/2023
-
-- Exposed `ignored_fields` as `Map<String, Vec<String>>` (KeyName => Args) for `HostParams`
-
-## 0.2.1
-
-Released on 28/07/2023
-
-- Added `parse_default_file` to parse directly the default ssh config file at `$HOME/.ssh/config`
-- Added `get_hosts` to retrieve current configuration's hosts
+> - fix: correctly apply configuration precedence in reverse parsing order
+>
+> This change fixes #11:
+>
+> Previously, the order of precedence applied to
+> parsed configuration was incorrect.
+>
+> Configuration was parsed, then sorted in
+> alphabetical order.
+>
+> Algorithms (ciphers, key
+> exchange algorithms, MACs, etc.) were incorrectly
+> applied during parsing.
+>
+> The correct precedence order follows
+> https://linux.die.net/man/5/ssh_config: the
+> configuration is read from top to bottom,
+> precedence is applied from bottom (lowest)
+> to the top (highest precedence).
+>
+> Options preceding the first `Host` block are
+> considered implicit command line options, in
+> line with OpenSSH's own implementation.
+>
+> This patch includes the following changes:
+>
+> - Remove the alphabetic ordering of host sections.
+> - Merge matching host sections in reverse order.
+> - More efficiently merge host sections with
+>   vastly reduced `clone`s. (`clone` on demand.)
+> - Resolve algorithms not during the parsing,
+>   but during the resolving stage.
+> - More efficiently resolve algorithms, without
+>   source list mutation.
+> - Adjust existing unit tests to test the corrected
+>   precedence algorithm.
+>
+> * feat: improve error-tests by matching on error enum variant
+>
+> This change improves error-tests by replacing
+> `Result::is_err` with a match against the error
+> enum.
+>
+> Previously, only the existence of an error result
+> was checked.
+>
+> With the first additional commit,
+> the kind of error is checked as well.
+>
+> - style: return `Result` from success tests, using `?` (Rust 2018 idiom)
+>
+> This change improves success-tests by applying
+> the Rust 2018 idiom of returning `Result`
+> from tests.
+>
+> This way, `Result::unwrap` and `Result::is_ok`
+> can be replaced by `?`.
+>
+> Any error occurring in a success-test
+> is propagated to the test runner.
+>
+> Some tests previously called `.ok().unwrap()` on
+> `Result`s, effectively first turning them into
+> `Option`s before unwrapping.
+>
+> This unidiomatic pattern is replaced
+> by `?` as well.
 
 ## 0.2.0
 
-Released on 09/05/2023
+Released on 2023-05-09
 
-- Added `ParseRule` field to `parse()` method to specify some rules for parsing. ❗ To keep the behaviour as-is use
-  `ParseRule::STRICT`
+### Added
 
-## 0.1.6
-
-Released on 03/03/2023
-
-- Added legacy field support
-  - HostbasedKeyTypes
-  - PubkeyAcceptedKeyTypes
-
-## 0.1.5
-
-Released on 27/02/2023
-
-- Fixed comments not being properly stripped
-
-## 0.1.4
-
-Released on 02/02/2023
-
-- Fixed [issue 2](https://github.com/veeso/ssh2-config/issues/2) hosts not being sorted by priority in host query
-
-## 0.1.3
-
-Released on 29/01/2022
-
-- Added missing `ForwardX11Trusted` field to known fields
-
-## 0.1.2
-
-Released on 11/01/2022
-
-- Implemented `IgnoreUnknown` parameter
-- Added `UseKeychain` support for MacOS
-
-## 0.1.1
-
-Released on 02/01/2022
-
-- Added `IdentityFile` parameter
+- Added `ParseRule` field to `parse()` method to specify some rules for parsing. ❗ To keep the behaviour as-is use `ParseRule::STRICT`
 
 ## 0.1.0
 
-Released on 04/12/2021
-
-- First release
+Released on 2021-12-04
