@@ -47,6 +47,8 @@ jobs:
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.58.0
       - name: Lint
         run: just lint "-- -D warnings"
 
@@ -67,6 +69,8 @@ jobs:
           key: ${{ runner.os }}-cargo-quality-${{ hashFiles('**/Cargo.lock') }}
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.58.0
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2.87.2
         with:
@@ -92,6 +96,8 @@ jobs:
           persist-credentials: false
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.58.0
       - name: Build documentation
         run: just doc
 
@@ -108,6 +114,8 @@ jobs:
           tool: cargo-deny
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.58.0
       - name: Check dependencies
         run: just deny
 
@@ -130,5 +138,7 @@ jobs:
         run: rustup toolchain install nightly --profile minimal --component rustfmt
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.58.0
       - name: Check generated source
         run: just check_default_algorithms
