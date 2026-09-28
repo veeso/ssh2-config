@@ -101,8 +101,8 @@ impl SshConfigParser {
             default_params,
         ));
 
-        // Current host pointer
-        let mut current_host = config.hosts.last_mut().unwrap();
+        // Current host index
+        let mut current_host_index = 0;
 
         let mut lines = reader.lines();
         // iter lines
@@ -120,9 +120,12 @@ impl SshConfigParser {
                 Ok((field, args)) => (field, args),
                 Err(SshParserError::UnknownField(field, args))
                     if rules.intersects(ParseRule::ALLOW_UNKNOWN_FIELDS)
-                        || current_host.params.ignored(&field) =>
+                        || config.hosts[current_host_index].params.ignored(&field) =>
                 {
-                    current_host.params.ignored_fields.insert(field, args);
+                    config.hosts[current_host_index]
+                        .params
+                        .ignored_fields
+                        .insert(field, args);
                     continue;
                 }
                 Err(SshParserError::UnknownField(field, args)) => {
@@ -140,14 +143,14 @@ impl SshConfigParser {
 
                 // Add a new host
                 config.hosts.push(Host::new(pattern, params));
-                // Update current host pointer
-                current_host = config.hosts.last_mut().expect("Just added hosts");
+                // Update current host index
+                current_host_index = config.hosts.len() - 1;
             } else {
                 // Update field
                 match Self::update_host(
                     field,
                     args,
-                    current_host,
+                    &mut config.hosts[current_host_index],
                     rules,
                     &config.default_algorithms,
                 ) {
@@ -155,14 +158,16 @@ impl SshConfigParser {
                     Ok(UpdateHost::NewHosts(new_hosts)) => {
                         trace!("Adding new hosts from 'UpdateHost::NewHosts': {new_hosts:?}",);
                         config.hosts.extend(new_hosts);
-                        current_host = config.hosts.last_mut().expect("Just added hosts");
                         Ok(())
                     }
                     // If we're allowing unsupported fields to be parsed, add them to the map
                     Err(SshParserError::UnsupportedField(field, args))
                         if rules.intersects(ParseRule::ALLOW_UNSUPPORTED_FIELDS) =>
                     {
-                        current_host.params.unsupported_fields.insert(field, args);
+                        config.hosts[current_host_index]
+                            .params
+                            .unsupported_fields
+                            .insert(field, args);
                         Ok(())
                     }
                     // Eat the error here to not break the API with this change
@@ -2807,6 +2812,31 @@ Host *
         assert_eq!(fridge_params.ciphers.algorithms().is_empty(), true);
         assert_eq!(fridge_params.user.as_deref().unwrap(), "luigi-verdi");
         assert_eq!(fridge_params.host_name.as_deref().unwrap(), "192.168.24.34");
+    }
+
+    #[test]
+    fn should_restore_parent_scope_after_include() -> Result<(), SshParserError> {
+        let mut included = NamedTempFile::new().expect("Failed to create included file");
+        included.write_all(b"Host foo\n    HostName foo.example\n")?;
+
+        let config = format!(
+            "Include {included}\nUser alice\n",
+            included = included.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        let default = config.query("github.com");
+        assert_eq!(default.user.as_deref(), Some("alice"));
+        assert!(default.host_name.is_none());
+
+        let foo = config.query("foo");
+        assert_eq!(foo.user.as_deref(), Some("alice"));
+        assert_eq!(foo.host_name.as_deref(), Some("foo.example"));
+
+        Ok(())
     }
 
     #[allow(dead_code)]
