@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.8.1
+
+Released on 2026-09-28
+
+### Fixed
+
+- **parser:** restore parent scope after includes
+
+> Keep the active host as an index while parsing so included host rules cannot invalidate the enclosing host reference. Continue applying directives after an Include to the parent host, and add regression coverage for values inherited by both the default and included hosts.
+
+- **parser:** preserve conditional include scope
+
+> Track the enclosing host clauses alongside each parsed host rule and require all inherited scopes to match during queries and host intersection checks. Preserve those scopes across nested and sequential includes so included configuration cannot leak outside its parent block, including negated patterns. Add regression coverage for conditional, nested, and consecutive includes and for first-obtained value precedence.
+
 ## 0.8.0
 
 Released on 2026-08-31
