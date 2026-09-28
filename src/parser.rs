@@ -12,7 +12,7 @@ use bitflags::bitflags;
 use glob::glob;
 use thiserror::Error;
 
-use super::{Host, HostClause, HostParams, SshConfig};
+use super::{Host, HostClause, HostParams, HostScope, SshConfig};
 use crate::params::AlgorithmsRule;
 use crate::{DefaultAlgorithms, RemoteForward, RemoteForwardDestination, RemoteForwardListen};
 
@@ -28,7 +28,7 @@ enum UpdateHost {
     /// Update current host
     UpdateHost,
     /// Add new hosts
-    NewHosts(Vec<Host>),
+    NewHosts(Vec<(Host, HostScope)>),
 }
 
 /// Ssh config parser error
@@ -96,13 +96,13 @@ impl SshConfigParser {
         // See https://github.com/openssh/openssh-portable/blob/master/readconf.c#L1173-L1176
         let mut default_params = HostParams::new(&config.default_algorithms);
         default_params.ignore_unknown = ignore_unknown;
-        config.hosts.push(Host::new(
-            vec![HostClause::new(String::from("*"), false)],
-            default_params,
-        ));
-
-        // Current host index
-        let mut current_host_index = 0;
+        let mut current_host_index = config.append_host(
+            Host::new(
+                vec![HostClause::new(String::from("*"), false)],
+                default_params,
+            ),
+            Vec::new(),
+        );
 
         let mut lines = reader.lines();
         // iter lines
@@ -142,9 +142,37 @@ impl SshConfigParser {
                 trace!("Adding new host: {pattern:?}",);
 
                 // Add a new host
-                config.hosts.push(Host::new(pattern, params));
                 // Update current host index
-                current_host_index = config.hosts.len() - 1;
+                current_host_index = config.append_host(Host::new(pattern, params), Vec::new());
+            } else if field == Field::Include {
+                let (pattern, inherited_scope, ignore_unknown) = {
+                    let host = &config.hosts[current_host_index];
+                    (
+                        host.pattern.clone(),
+                        config
+                            .host_scopes
+                            .get(current_host_index)
+                            .cloned()
+                            .unwrap_or_default(),
+                        host.params.ignore_unknown.clone(),
+                    )
+                };
+                let new_hosts = Self::include_files(
+                    args,
+                    &pattern,
+                    &inherited_scope,
+                    rules,
+                    &config.default_algorithms,
+                    ignore_unknown.clone(),
+                )?;
+                for (host, scope) in new_hosts {
+                    config.append_host(host, scope);
+                }
+
+                let mut params = HostParams::new(&config.default_algorithms);
+                params.ignore_unknown = ignore_unknown;
+                current_host_index =
+                    config.append_host(Host::new(pattern, params), inherited_scope);
             } else {
                 // Update field
                 match Self::update_host(
@@ -157,7 +185,9 @@ impl SshConfigParser {
                     Ok(UpdateHost::UpdateHost) => Ok(()),
                     Ok(UpdateHost::NewHosts(new_hosts)) => {
                         trace!("Adding new hosts from 'UpdateHost::NewHosts': {new_hosts:?}",);
-                        config.hosts.extend(new_hosts);
+                        for (host, scope) in new_hosts {
+                            config.append_host(host, scope);
+                        }
                         Ok(())
                     }
                     // If we're allowing unsupported fields to be parsed, add them to the map
@@ -391,7 +421,8 @@ impl SshConfigParser {
             Field::Include => {
                 return Self::include_files(
                     args,
-                    host,
+                    &host.pattern,
+                    &[],
                     rules,
                     default_algos,
                     host.params.ignore_unknown.clone(),
@@ -570,14 +601,15 @@ impl SshConfigParser {
         }
     }
 
-    /// include a file by parsing it and updating host rules by merging the read config to the current one for the host
+    /// Include a file and return its ordered host rules with inherited scopes.
     fn include_files(
         args: Vec<String>,
-        host: &mut Host,
+        pattern: &[HostClause],
+        inherited_scope: &[Vec<HostClause>],
         rules: ParseRule,
         default_algos: &DefaultAlgorithms,
         ignore_unknown: Option<Vec<String>>,
-    ) -> SshParserResult<Vec<Host>> {
+    ) -> SshParserResult<Vec<(Host, HostScope)>> {
         let path_match = Self::resolve_include_path(&Self::parse_string(args)?);
 
         trace!("include files: {path_match}",);
@@ -592,21 +624,19 @@ impl SshConfigParser {
             let mut sub_config = SshConfig::default().default_algorithms(default_algos.clone());
             Self::parse(&mut sub_config, &mut reader, rules, ignore_unknown.clone())?;
 
-            // merge sub-config into host
-            for pattern in &host.pattern {
-                if pattern.negated {
-                    trace!("excluding sub-config for pattern: {pattern:?}",);
-                    continue;
-                }
-                trace!("merging sub-config for pattern: {pattern:?}",);
-                let params = sub_config.query(&pattern.pattern);
-                host.params.overwrite_if_none(&params);
-            }
-
-            // merge additional hosts
-            for sub_host in sub_config.hosts.into_iter().skip(1) {
+            let SshConfig {
+                hosts: sub_hosts,
+                host_scopes: sub_scopes,
+                ..
+            } = sub_config;
+            for (index, sub_host) in sub_hosts.into_iter().enumerate() {
                 trace!("adding sub-host: {sub_host:?}",);
-                new_hosts.push(sub_host);
+                let mut scope = inherited_scope.to_vec();
+                scope.push(pattern.to_vec());
+                if let Some(sub_scope) = sub_scopes.get(index) {
+                    scope.extend(sub_scope.iter().cloned());
+                }
+                new_hosts.push((sub_host, scope));
             }
         }
 
@@ -2734,6 +2764,7 @@ Host *
         );
         assert_eq!(default_params.compression.unwrap(), true);
         assert_eq!(default_params.connection_attempts.unwrap(), 10);
+        assert_eq!(default_params.port, Some(345));
 
         // verify include 1 overwrites the default value
         let glob_params = config.query("192.168.1.1");
@@ -2839,6 +2870,135 @@ Host *
         Ok(())
     }
 
+    #[test]
+    fn should_keep_included_values_before_parent_fallbacks() -> Result<(), SshParserError> {
+        let mut included = NamedTempFile::new().expect("Failed to create included file");
+        included.write_all(b"Host foo\n    User bob\n")?;
+
+        let config = format!(
+            "Include {included}\nUser alice\n",
+            included = included.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(config.query("foo").user.as_deref(), Some("bob"));
+        assert_eq!(config.query("github.com").user.as_deref(), Some("alice"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_require_enclosing_and_included_host_scopes() -> Result<(), SshParserError> {
+        let mut included = NamedTempFile::new().expect("Failed to create included file");
+        included.write_all(b"Host app*\n    HostName included.internal\n")?;
+
+        let config = format!(
+            concat!(
+                "Host *.example.com !app-blocked.example.com\n",
+                "    Include {included}\n",
+                "    Port 2222\n",
+                "Host *\n",
+                "    User fallback\n",
+            ),
+            included = included.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        let allowed = config.query("app1.example.com");
+        assert_eq!(allowed.host_name.as_deref(), Some("included.internal"));
+        assert_eq!(allowed.port, Some(2222));
+        assert_eq!(allowed.user.as_deref(), Some("fallback"));
+
+        let negated = config.query("app-blocked.example.com");
+        assert!(negated.host_name.is_none());
+        assert!(negated.port.is_none());
+        assert_eq!(negated.user.as_deref(), Some("fallback"));
+
+        let outside = config.query("app1.example.net");
+        assert!(outside.host_name.is_none());
+        assert!(outside.port.is_none());
+        assert_eq!(outside.user.as_deref(), Some("fallback"));
+
+        assert!(
+            config
+                .intersecting_hosts("app-blocked.example.com")
+                .all(|host| host.params.host_name.as_deref() != Some("included.internal"))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_restore_scope_between_consecutive_includes() -> Result<(), SshParserError> {
+        let mut first = NamedTempFile::new().expect("Failed to create first include");
+        first.write_all(b"Host bar\n    HostName bar.internal\n")?;
+        let mut second = NamedTempFile::new().expect("Failed to create second include");
+        second.write_all(b"Port 2222\n")?;
+
+        let config = format!(
+            concat!(
+                "Host foo\n",
+                "    Include {first}\n",
+                "    Include {second}\n",
+                "    User alice\n",
+            ),
+            first = first.path().display(),
+            second = second.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        let foo = config.query("foo");
+        assert_eq!(foo.port, Some(2222));
+        assert_eq!(foo.user.as_deref(), Some("alice"));
+
+        let bar = config.query("bar");
+        assert!(bar.host_name.is_none());
+        assert!(bar.port.is_none());
+        assert!(bar.user.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_preserve_all_nested_include_scopes() -> Result<(), SshParserError> {
+        let mut inner = NamedTempFile::new().expect("Failed to create inner include");
+        inner.write_all(b"User nested\n")?;
+
+        let mut outer = NamedTempFile::new().expect("Failed to create outer include");
+        writeln!(
+            outer,
+            "Host app*\n    Include {inner}",
+            inner = inner.path().display(),
+        )?;
+
+        let config = format!(
+            "Host *.example.com\n    Include {outer}\n",
+            outer = outer.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(
+            config.query("app1.example.com").user.as_deref(),
+            Some("nested")
+        );
+        assert!(config.query("app1.example.net").user.is_none());
+        assert!(config.query("other.example.com").user.is_none());
+
+        Ok(())
+    }
+
     #[allow(dead_code)]
     struct ConfigWithInclude {
         config: NamedTempFile,
@@ -2888,6 +3048,7 @@ Host tostapane
     Pluto 56
     Include {inc2}
 
+Host *
 Include {inc3}
 Include {inc4}
 "##,

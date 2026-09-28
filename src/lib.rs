@@ -142,6 +142,7 @@ mod serializer;
 pub use self::default_algorithms::{
     DefaultAlgorithms, default_algorithms as default_openssh_algorithms,
 };
+use self::host::clauses_intersect;
 pub use self::host::{Host, HostClause};
 #[doc(inline)]
 pub use self::params::{
@@ -158,7 +159,11 @@ pub struct SshConfig {
     /// Rulesets for hosts.
     /// Default config will be stored with key `*`
     hosts: Vec<Host>,
+    /// Inherited scopes for each host rule.
+    host_scopes: Vec<HostScope>,
 }
+
+pub(crate) type HostScope = Vec<Vec<HostClause>>;
 
 impl fmt::Display for SshConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -179,16 +184,40 @@ impl SshConfig {
     pub fn from_hosts(hosts: Vec<Host>) -> Self {
         Self {
             default_algorithms: DefaultAlgorithms::default(),
+            host_scopes: vec![Vec::new(); hosts.len()],
             hosts,
         }
+    }
+
+    /// Appends a host rule and its inherited scope.
+    pub(crate) fn append_host(&mut self, host: Host, scope: HostScope) -> usize {
+        self.hosts.push(host);
+        self.host_scopes.push(scope);
+        self.hosts.len() - 1
+    }
+
+    /// Returns whether a host rule and all its inherited scopes match a query.
+    pub(crate) fn host_matches(&self, index: usize, pattern: &str) -> bool {
+        let Some(host) = self.hosts.get(index) else {
+            return false;
+        };
+        if !host.intersects(pattern) {
+            return false;
+        }
+
+        self.host_scopes.get(index).is_none_or(|scope| {
+            scope
+                .iter()
+                .all(|clauses| clauses_intersect(clauses, pattern))
+        })
     }
 
     /// Query params for a certain host. Returns [`HostParams`] for the host.
     pub fn query<S: AsRef<str>>(&self, pattern: S) -> HostParams {
         let mut params = HostParams::new(&self.default_algorithms);
         // iter keys, overwrite if None top-down
-        for host in self.hosts.iter() {
-            if host.intersects(pattern.as_ref()) {
+        for (index, host) in self.hosts.iter().enumerate() {
+            if self.host_matches(index, pattern.as_ref()) {
                 debug!(
                     "Merging params for host: {:?} into params {params:?}",
                     host.pattern
@@ -203,7 +232,11 @@ impl SshConfig {
 
     /// Get an iterator over the [`Host`]s which intersect with the given host pattern
     pub fn intersecting_hosts(&self, pattern: &str) -> impl Iterator<Item = &'_ Host> {
-        self.hosts.iter().filter(|host| host.intersects(pattern))
+        self.hosts
+            .iter()
+            .enumerate()
+            .filter(move |(index, _)| self.host_matches(*index, pattern))
+            .map(|(_, host)| host)
     }
 
     /// Set default algorithms for ssh.

@@ -23,17 +23,22 @@ impl Host {
 
     /// Returns whether `host` argument intersects the host clauses
     pub fn intersects(&self, host: &str) -> bool {
-        let mut has_matched = false;
-        for entry in self.pattern.iter() {
-            let matches = entry.intersects(host);
-            // If the entry is negated and it matches we can stop searching
-            if matches && entry.negated {
-                return false;
-            }
-            has_matched |= matches;
-        }
-        has_matched
+        clauses_intersect(&self.pattern, host)
     }
+}
+
+/// Returns whether a host name intersects a list of host clauses.
+pub(crate) fn clauses_intersect(clauses: &[HostClause], host: &str) -> bool {
+    let mut has_matched = false;
+    for entry in clauses {
+        let matches = entry.intersects(host);
+        // If the entry is negated and it matches we can stop searching
+        if matches && entry.negated {
+            return false;
+        }
+        has_matched |= matches;
+    }
+    has_matched
 }
 
 /// Describes a single clause to match host
