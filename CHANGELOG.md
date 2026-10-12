@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.8.2
+
+Released on 2026-10-12
+
+### Fixed
+
+- **parser:** accept true and false as boolean values
+
+> OpenSSH accepts yes/true and no/false, case-insensitively. Previously only lowercase yes and no parsed, so options such as ForwardAgent true failed.
+
 ## 0.8.1
 
 Released on 2026-09-28
