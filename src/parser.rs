@@ -709,13 +709,18 @@ impl SshConfigParser {
 
     // -- value parsers
 
-    /// parse boolean value
+    /// Parse boolean value.
+    ///
+    /// Like OpenSSH, accepts `yes`/`true` and `no`/`false`, case-insensitively.
     fn parse_boolean(args: Vec<String>) -> SshParserResult<bool> {
-        match args.first().map(|x| x.as_str()) {
-            Some("yes") => Ok(true),
-            Some("no") => Ok(false),
-            Some(_) => Err(SshParserError::ExpectedBoolean),
-            None => Err(SshParserError::MissingArgument),
+        let value = args.first().ok_or(SshParserError::MissingArgument)?;
+
+        if value.eq_ignore_ascii_case("yes") || value.eq_ignore_ascii_case("true") {
+            Ok(true)
+        } else if value.eq_ignore_ascii_case("no") || value.eq_ignore_ascii_case("false") {
+            Ok(false)
+        } else {
+            Err(SshParserError::ExpectedBoolean)
         }
     }
 
@@ -1817,6 +1822,18 @@ Host *
             SshConfigParser::parse_boolean(vec![String::from("no")])?,
             false
         );
+        Ok(())
+    }
+
+    #[test]
+    fn should_parse_boolean_true_false_case_insensitive() -> Result<(), SshParserError> {
+        crate::test_log();
+        for value in ["true", "True", "YES", "Yes"] {
+            assert!(SshConfigParser::parse_boolean(vec![value.to_string()])?);
+        }
+        for value in ["false", "False", "NO", "No"] {
+            assert!(!SshConfigParser::parse_boolean(vec![value.to_string()])?);
+        }
         Ok(())
     }
 
