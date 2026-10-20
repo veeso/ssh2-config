@@ -4,12 +4,12 @@
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error as IoError};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 
 use bitflags::bitflags;
-use glob::glob;
+use glob::{Pattern, glob};
 use thiserror::Error;
 
 use super::{Host, HostClause, HostParams, HostScope, SshConfig};
@@ -22,13 +22,22 @@ use field::Field;
 
 pub type SshParserResult<T> = Result<T, SshParserError>;
 
-/// [`SshConfigParser::update_host`] result
-#[derive(Debug, PartialEq, Eq)]
-enum UpdateHost {
-    /// Update current host
-    UpdateHost,
-    /// Add new hosts
-    NewHosts(Vec<(Host, HostScope)>),
+/// State shared by a parse and every file it includes.
+pub(crate) struct IncludeContext {
+    /// Resolved home directory used to expand `~` and relative `Include` paths.
+    home: Option<PathBuf>,
+    /// Canonical paths of the files currently being included.
+    stack: Vec<PathBuf>,
+}
+
+impl IncludeContext {
+    /// Creates a context with the given home directory and no file being included.
+    pub(crate) fn new(home: Option<PathBuf>) -> Self {
+        Self {
+            home,
+            stack: Vec::new(),
+        }
+    }
 }
 
 /// Ssh config parser error
@@ -44,6 +53,16 @@ pub enum SshParserError {
     ExpectedAlgorithms,
     #[error("expected path")]
     ExpectedPath,
+    /// A `~` or relative path needs a home directory, and none is available.
+    ///
+    /// The string is the argument that needed the home directory.
+    #[error("home directory not found for argument: {0}")]
+    HomeNotFound(String),
+    /// An `Include` chain reached a file that is already being included.
+    ///
+    /// The path is the canonical path of the file that closes the loop.
+    #[error("include cycle detected: {path}", path = .0.display())]
+    IncludeCycle(PathBuf),
     #[error("IO error: {0}")]
     Io(#[from] IoError),
     #[error("glob error: {0}")]
@@ -83,11 +102,15 @@ pub(crate) struct SshConfigParser;
 
 impl SshConfigParser {
     /// Parse reader lines and apply parameters to configuration
+    ///
+    /// `include` holds the home directory used to expand `~` and relative `Include` paths,
+    /// and the canonical paths of the files currently being included.
     pub(crate) fn parse(
         config: &mut SshConfig,
         reader: &mut impl BufRead,
         rules: ParseRule,
         ignore_unknown: Option<Vec<String>>,
+        include: &mut IncludeContext,
     ) -> SshParserResult<()> {
         // Options preceding the first `Host` section
         // are parsed as command line options;
@@ -164,6 +187,7 @@ impl SshConfigParser {
                     rules,
                     &config.default_algorithms,
                     ignore_unknown.clone(),
+                    include,
                 )?;
                 for (host, scope) in new_hosts {
                     config.append_host(host, scope);
@@ -175,23 +199,15 @@ impl SshConfigParser {
                     config.append_host(Host::new(pattern, params), inherited_scope);
             } else {
                 // Update field
-                match Self::update_host(
+                Self::update_host(
                     field,
                     args,
                     &mut config.hosts[current_host_index],
-                    rules,
-                    &config.default_algorithms,
-                ) {
-                    Ok(UpdateHost::UpdateHost) => Ok(()),
-                    Ok(UpdateHost::NewHosts(new_hosts)) => {
-                        trace!("Adding new hosts from 'UpdateHost::NewHosts': {new_hosts:?}",);
-                        for (host, scope) in new_hosts {
-                            config.append_host(host, scope);
-                        }
-                        Ok(())
-                    }
+                    include.home.as_deref(),
+                )
+                .or_else(|err| match err {
                     // If we're allowing unsupported fields to be parsed, add them to the map
-                    Err(SshParserError::UnsupportedField(field, args))
+                    SshParserError::UnsupportedField(field, args)
                         if rules.intersects(ParseRule::ALLOW_UNSUPPORTED_FIELDS) =>
                     {
                         config.hosts[current_host_index]
@@ -203,9 +219,9 @@ impl SshConfigParser {
                     // Eat the error here to not break the API with this change
                     // Also it'd be weird to error on correct ssh_config's just because they're
                     // not supported by this library
-                    Err(SshParserError::UnsupportedField(_, _)) => Ok(()),
-                    Err(e) => Err(e),
-                }?;
+                    SshParserError::UnsupportedField(_, _) => Ok(()),
+                    e => Err(e),
+                })?;
             }
         }
 
@@ -351,9 +367,8 @@ impl SshConfigParser {
         field: Field,
         args: Vec<String>,
         host: &mut Host,
-        rules: ParseRule,
-        default_algos: &DefaultAlgorithms,
-    ) -> SshParserResult<UpdateHost> {
+        home: Option<&Path>,
+    ) -> SshParserResult<()> {
         trace!("parsing field {field:?} with args {args:?}",);
         let params = &mut host.params;
         match field {
@@ -378,7 +393,7 @@ impl SshConfigParser {
                 params.ca_signature_algorithms.apply(rule);
             }
             Field::CertificateFile => {
-                let value = Self::parse_path(args)?;
+                let value = Self::parse_path(args, home)?;
                 trace!("certificate_file: {value:?}",);
                 params.certificate_file = Some(value);
             }
@@ -418,19 +433,9 @@ impl SshConfigParser {
                 trace!("host_name: {value}",);
                 params.host_name = Some(value);
             }
-            Field::Include => {
-                return Self::include_files(
-                    args,
-                    &host.pattern,
-                    &[],
-                    rules,
-                    default_algos,
-                    host.params.ignore_unknown.clone(),
-                )
-                .map(UpdateHost::NewHosts);
-            }
+            Field::Include => { /* handled in `parse` before `update_host` is called */ }
             Field::IdentityFile => {
-                let value = Self::parse_path_list(args)?;
+                let value = Self::parse_path_list(args, home)?;
                 trace!("identity_file: {value:?}",);
                 if let Some(existing) = &mut params.identity_file {
                     existing.extend(value);
@@ -570,38 +575,47 @@ impl SshConfigParser {
                 return Err(SshParserError::UnsupportedField(field.to_string(), args));
             }
         }
-        Ok(UpdateHost::UpdateHost)
+        Ok(())
     }
 
     /// Resolve the include path for a given path match.
     ///
-    /// If the path match is absolute, it just returns the path as-is;
-    /// if it is relative, it prepends $HOME/.ssh to it
-    fn resolve_include_path(path_match: &str) -> String {
+    /// Absolute paths are returned as-is. `~` and `~` plus a path separator are expanded against `home`,
+    /// other `~`-prefixed paths, such as `~user/...`, are kept as-is, like [`Self::parse_path_arg`] does,
+    /// and any other relative path is resolved against `home/.ssh`.
+    ///
+    /// The result is a glob pattern: `home` is escaped, so only `path_match` carries pattern syntax.
+    fn resolve_include_path(path_match: &str, home: Option<&Path>) -> SshParserResult<String> {
         #[cfg(windows)]
         const PATH_SEPARATOR: &str = "\\";
         #[cfg(unix)]
         const PATH_SEPARATOR: &str = "/";
 
-        // if path match doesn't start with the path separator, prepend it
+        let escaped_home =
+            |home: &Path| PathBuf::from(Pattern::escape(&home.display().to_string()));
+
         if path_match.starts_with(PATH_SEPARATOR) {
-            path_match.to_string()
+            Ok(path_match.to_string())
+        } else if let Some((home, rest)) = Self::split_home_prefix(path_match, home)? {
+            Ok(Self::join_home(&escaped_home(home), rest)
+                .display()
+                .to_string())
+        } else if path_match.starts_with('~') {
+            Ok(path_match.to_string())
         } else {
-            let home_dir = dirs::home_dir().unwrap_or(PathBuf::from(PATH_SEPARATOR));
-            // if path_match starts with `~`, strip it and prepend $HOME
-            if let Some(stripped) = path_match.strip_prefix("~") {
-                format!("{dir}{PATH_SEPARATOR}{stripped}", dir = home_dir.display())
-            } else {
-                // prepend $HOME/.ssh
-                format!(
-                    "{dir}{PATH_SEPARATOR}{path_match}",
-                    dir = home_dir.join(".ssh").display()
-                )
-            }
+            let home = home.ok_or_else(|| SshParserError::HomeNotFound(path_match.to_string()))?;
+            Ok(escaped_home(home)
+                .join(".ssh")
+                .join(path_match)
+                .display()
+                .to_string())
         }
     }
 
     /// Include every file matched by each path argument, in order, and return its ordered host rules with inherited scopes.
+    ///
+    /// `include.stack` holds the canonical paths of the files currently being included,
+    /// so an include that reaches one of them fails with [`SshParserError::IncludeCycle`].
     fn include_files(
         args: Vec<String>,
         pattern: &[HostClause],
@@ -609,6 +623,7 @@ impl SshConfigParser {
         rules: ParseRule,
         default_algos: &DefaultAlgorithms,
         ignore_unknown: Option<Vec<String>>,
+        include: &mut IncludeContext,
     ) -> SshParserResult<Vec<(Host, HostScope)>> {
         if args.is_empty() {
             return Err(SshParserError::MissingArgument);
@@ -617,17 +632,30 @@ impl SshConfigParser {
         let mut new_hosts = vec![];
 
         for arg in args {
-            let path_match = Self::resolve_include_path(&arg);
+            let path_match = Self::resolve_include_path(&arg, include.home.as_deref())?;
 
             trace!("include files: {path_match}",);
             let files = glob(&path_match)?;
 
             for file in files {
                 let file = file?;
+                let canonical = file.canonicalize()?;
+                if include.stack.contains(&canonical) {
+                    return Err(SshParserError::IncludeCycle(canonical));
+                }
                 trace!("including file: {}", file.display());
                 let mut reader = BufReader::new(File::open(file)?);
                 let mut sub_config = SshConfig::default().default_algorithms(default_algos.clone());
-                Self::parse(&mut sub_config, &mut reader, rules, ignore_unknown.clone())?;
+                include.stack.push(canonical);
+                let parsed = Self::parse(
+                    &mut sub_config,
+                    &mut reader,
+                    rules,
+                    ignore_unknown.clone(),
+                    include,
+                );
+                include.stack.pop();
+                parsed?;
 
                 let SshConfig {
                     hosts: sub_hosts,
@@ -775,37 +803,73 @@ impl SshConfigParser {
     }
 
     /// Parse a list of paths
-    fn parse_path_list(args: Vec<String>) -> SshParserResult<Vec<PathBuf>> {
+    fn parse_path_list(args: Vec<String>, home: Option<&Path>) -> SshParserResult<Vec<PathBuf>> {
         if args.is_empty() {
             return Err(SshParserError::MissingArgument);
         }
         args.iter()
-            .map(|x| Self::parse_path_arg(x.as_str()))
+            .map(|x| Self::parse_path_arg(x.as_str(), home))
             .collect()
     }
 
     /// Parse path argument
-    fn parse_path(args: Vec<String>) -> SshParserResult<PathBuf> {
+    fn parse_path(args: Vec<String>, home: Option<&Path>) -> SshParserResult<PathBuf> {
         if let Some(s) = args.first() {
-            Self::parse_path_arg(s)
+            Self::parse_path_arg(s, home)
         } else {
             Err(SshParserError::MissingArgument)
         }
     }
 
-    /// Parse path argument
-    fn parse_path_arg(s: &str) -> SshParserResult<PathBuf> {
-        // Remove tilde
-        let s = if s.starts_with('~') {
-            let home_dir = dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("~"))
-                .to_string_lossy()
-                .to_string();
-            s.replacen('~', &home_dir, 1)
+    /// Parse path argument, expanding a leading `~` or `~` plus a path separator against `home`
+    ///
+    /// Other `~`-prefixed arguments, such as `~user/...`, are kept as-is.
+    fn parse_path_arg(s: &str, home: Option<&Path>) -> SshParserResult<PathBuf> {
+        Ok(match Self::split_home_prefix(s, home)? {
+            Some((home, rest)) => Self::join_home(home, rest),
+            None => PathBuf::from(s),
+        })
+    }
+
+    /// Split `s` into the home directory and the part after a leading `~` that refers to it.
+    ///
+    /// Returns `None` when `s` does not start with a bare `~` or `~` plus a path separator,
+    /// and fails with [`SshParserError::HomeNotFound`] when it does but `home` is `None`.
+    fn split_home_prefix<'a>(
+        s: &'a str,
+        home: Option<&'a Path>,
+    ) -> SshParserResult<Option<(&'a Path, &'a str)>> {
+        match Self::strip_home_prefix(s) {
+            Some(rest) => {
+                let home = home.ok_or_else(|| SshParserError::HomeNotFound(s.to_string()))?;
+                Ok(Some((home, rest)))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Join `rest` to `home`, returning `home` itself when `rest` is empty.
+    fn join_home(home: &Path, rest: &str) -> PathBuf {
+        if rest.is_empty() {
+            home.to_path_buf()
         } else {
-            s.to_string()
-        };
-        Ok(PathBuf::from(s))
+            home.join(rest)
+        }
+    }
+
+    /// Return the part of `s` after a leading `~` that refers to the home directory.
+    ///
+    /// Matches a bare `~` or `~` followed by a path separator, and returns `None`
+    /// for any other argument, including `~user/...`.
+    fn strip_home_prefix(s: &str) -> Option<&str> {
+        let rest = s.strip_prefix('~')?;
+        if rest.is_empty() {
+            Some(rest)
+        } else if rest.starts_with(std::path::is_separator) {
+            Some(rest.trim_start_matches(std::path::is_separator))
+        } else {
+            None
+        }
     }
 
     /// Parse port number argument
@@ -1289,7 +1353,7 @@ mod tests {
             .unwrap();
 
         let home_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("~"))
+            .expect("home directory must exist")
             .to_string_lossy()
             .to_string();
 
@@ -1338,8 +1402,7 @@ mod tests {
             Field::BindAddress,
             vec![String::from("127.0.0.1")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.bind_address.as_deref().unwrap(), "127.0.0.1");
         Ok(())
@@ -1353,8 +1416,7 @@ mod tests {
             Field::BindInterface,
             vec![String::from("aaa")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.bind_interface.as_deref().unwrap(), "aaa");
         Ok(())
@@ -1368,8 +1430,7 @@ mod tests {
             Field::CaSignatureAlgorithms,
             vec![String::from("a,b,c")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.ca_signature_algorithms.algorithms(),
@@ -1386,8 +1447,7 @@ mod tests {
             Field::CertificateFile,
             vec![String::from("/tmp/a.crt")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.certificate_file.as_deref().unwrap(),
@@ -1400,13 +1460,7 @@ mod tests {
     fn should_update_host_ciphers() -> Result<(), SshParserError> {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
-        SshConfigParser::update_host(
-            Field::Ciphers,
-            vec![String::from("a,b,c")],
-            &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
-        )?;
+        SshConfigParser::update_host(Field::Ciphers, vec![String::from("a,b,c")], &mut host, None)?;
         assert_eq!(host.params.ciphers.algorithms(), &["a", "b", "c"]);
         Ok(())
     }
@@ -1419,8 +1473,7 @@ mod tests {
             Field::Compression,
             vec![String::from("yes")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.compression.unwrap(), true);
         Ok(())
@@ -1434,8 +1487,7 @@ mod tests {
             Field::ConnectionAttempts,
             vec![String::from("4")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.connection_attempts.unwrap(), 4);
         Ok(())
@@ -1449,8 +1501,7 @@ mod tests {
             Field::ConnectTimeout,
             vec![String::from("10")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.connect_timeout.unwrap(),
@@ -1467,8 +1518,7 @@ mod tests {
             Field::HostKeyAlgorithms,
             vec![String::from("a,b,c")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.host_key_algorithms.algorithms(),
@@ -1485,8 +1535,7 @@ mod tests {
             Field::HostName,
             vec![String::from("192.168.1.1")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.host_name.as_deref().unwrap(), "192.168.1.1");
         Ok(())
@@ -1500,8 +1549,7 @@ mod tests {
             Field::IgnoreUnknown,
             vec![String::from("a,b,c")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.ignore_unknown.as_deref().unwrap(),
@@ -1518,8 +1566,7 @@ mod tests {
             Field::KexAlgorithms,
             vec![String::from("a,b,c")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.kex_algorithms.algorithms(), &["a", "b", "c"]);
         Ok(())
@@ -1529,13 +1576,7 @@ mod tests {
     fn should_update_host_mac() -> Result<(), SshParserError> {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
-        SshConfigParser::update_host(
-            Field::Mac,
-            vec![String::from("a,b,c")],
-            &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
-        )?;
+        SshConfigParser::update_host(Field::Mac, vec![String::from("a,b,c")], &mut host, None)?;
         assert_eq!(host.params.mac.algorithms(), &["a", "b", "c"]);
         Ok(())
     }
@@ -1544,13 +1585,7 @@ mod tests {
     fn should_update_host_port() -> Result<(), SshParserError> {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
-        SshConfigParser::update_host(
-            Field::Port,
-            vec![String::from("2222")],
-            &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
-        )?;
+        SshConfigParser::update_host(Field::Port, vec![String::from("2222")], &mut host, None)?;
         assert_eq!(host.params.port.unwrap(), 2222);
         Ok(())
     }
@@ -1563,8 +1598,7 @@ mod tests {
             Field::PubkeyAcceptedAlgorithms,
             vec![String::from("a,b,c")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.pubkey_accepted_algorithms.algorithms(),
@@ -1581,8 +1615,7 @@ mod tests {
             Field::PubkeyAuthentication,
             vec![String::from("yes")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.pubkey_authentication.unwrap(), true);
         Ok(())
@@ -1596,15 +1629,13 @@ mod tests {
             Field::RemoteForward,
             vec![String::from("3005"), String::from("localhost:80")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         SshConfigParser::update_host(
             Field::RemoteForward,
             vec![String::from("/tmp/remote.sock")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.remote_forward,
@@ -1668,8 +1699,7 @@ Host *
             Field::ServerAliveInterval,
             vec![String::from("40")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(
             host.params.server_alive_interval.unwrap(),
@@ -1686,8 +1716,7 @@ Host *
             Field::TcpKeepAlive,
             vec![String::from("no")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         )?;
         assert_eq!(host.params.tcp_keep_alive.unwrap(), false);
         Ok(())
@@ -1697,13 +1726,7 @@ Host *
     fn should_update_host_user() -> Result<(), SshParserError> {
         crate::test_log();
         let mut host = Host::new(vec![], HostParams::new(&DefaultAlgorithms::empty()));
-        SshConfigParser::update_host(
-            Field::User,
-            vec![String::from("pippo")],
-            &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
-        )?;
+        SshConfigParser::update_host(Field::User, vec![String::from("pippo")], &mut host, None)?;
         assert_eq!(host.params.user.as_deref().unwrap(), "pippo");
         Ok(())
     }
@@ -1716,8 +1739,7 @@ Host *
             Field::PasswordAuthentication,
             vec![String::from("yes")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         );
 
         match result {
@@ -1737,8 +1759,7 @@ Host *
             Field::PasswordAuthentication,
             vec![String::from("yes")],
             &mut host,
-            ParseRule::ALLOW_UNKNOWN_FIELDS,
-            &DefaultAlgorithms::empty(),
+            None,
         );
 
         match result {
@@ -1966,20 +1987,8 @@ Host *
     fn should_parse_path() -> Result<(), SshParserError> {
         crate::test_log();
         assert_eq!(
-            SshConfigParser::parse_path(vec![String::from("/tmp/a.txt")])?,
+            SshConfigParser::parse_path(vec![String::from("/tmp/a.txt")], None)?,
             PathBuf::from("/tmp/a.txt")
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn should_parse_path_and_resolve_tilde() -> Result<(), SshParserError> {
-        crate::test_log();
-        let mut expected = dirs::home_dir().unwrap();
-        expected.push(".ssh/id_dsa");
-        assert_eq!(
-            SshConfigParser::parse_path(vec![String::from("~/.ssh/id_dsa")])?,
-            expected
         );
         Ok(())
     }
@@ -1988,10 +1997,10 @@ Host *
     fn should_parse_path_list() -> Result<(), SshParserError> {
         crate::test_log();
         assert_eq!(
-            SshConfigParser::parse_path_list(vec![
-                String::from("/tmp/a.txt"),
-                String::from("/tmp/b.txt")
-            ])?,
+            SshConfigParser::parse_path_list(
+                vec![String::from("/tmp/a.txt"), String::from("/tmp/b.txt")],
+                None
+            )?,
             vec![PathBuf::from("/tmp/a.txt"), PathBuf::from("/tmp/b.txt")]
         );
         Ok(())
@@ -2001,7 +2010,7 @@ Host *
     fn should_fail_parse_path_list() {
         crate::test_log();
         assert!(matches!(
-            SshConfigParser::parse_path_list(vec![]).unwrap_err(),
+            SshConfigParser::parse_path_list(vec![], None).unwrap_err(),
             SshParserError::MissingArgument
         ));
     }
@@ -2010,7 +2019,7 @@ Host *
     fn should_fail_parsing_path() {
         crate::test_log();
         assert!(matches!(
-            SshConfigParser::parse_path(vec![]).unwrap_err(),
+            SshConfigParser::parse_path(vec![], None).unwrap_err(),
             SshParserError::MissingArgument
         ));
     }
@@ -2172,32 +2181,254 @@ Host *
         let expected = PathBuf::from("/tmp/config.local");
 
         let s = "/tmp/config.local";
-        let resolved = PathBuf::from(SshConfigParser::resolve_include_path(s));
+        let resolved = PathBuf::from(
+            SshConfigParser::resolve_include_path(s, None).expect("absolute path resolves"),
+        );
         assert_eq!(resolved, expected);
     }
 
     #[test]
-    fn test_should_resolve_relative_include_path() {
+    fn should_fail_resolving_home_relative_paths_without_home() {
+        crate::test_log();
+        type Resolve = fn(&str) -> SshParserResult<()>;
+        let parse_path: Resolve = |s| SshConfigParser::parse_path_arg(s, None).map(drop);
+        let resolve_include: Resolve = |s| SshConfigParser::resolve_include_path(s, None).map(drop);
+        let cases: [(&str, &str, Resolve); 5] = [
+            ("parse_path_arg", "~/.ssh/id_rsa", parse_path),
+            ("parse_path_arg", "~", parse_path),
+            (
+                "resolve_include_path",
+                "~/.ssh/config.local",
+                resolve_include,
+            ),
+            ("resolve_include_path", "config.d/*", resolve_include),
+            ("resolve_include_path", "~", resolve_include),
+        ];
+        for (name, input, resolve) in cases {
+            assert!(
+                matches!(resolve(input), Err(SshParserError::HomeNotFound(ref arg)) if arg == input),
+                "{name}({input})"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn should_expand_tilde_followed_by_windows_separator() -> Result<(), SshParserError> {
+        crate::test_log();
+        let home = Path::new("/home/alice");
+        assert_eq!(
+            SshConfigParser::parse_path_arg("~\\.ssh\\id_rsa", Some(home))?,
+            home.join(".ssh").join("id_rsa")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_resolve_path_arguments_against_home() {
         crate::test_log();
 
-        let expected = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("~"))
-            .join(".ssh")
-            .join("config.local");
-
-        let s = "config.local";
-        let resolved = PathBuf::from(SshConfigParser::resolve_include_path(s));
-        assert_eq!(resolved, expected);
+        let home = Some(Path::new("/home/alice"));
+        // (input, expected `parse_path_arg`, expected `resolve_include_path`)
+        let cases: [(&str, &str, &str); 6] = [
+            ("~", "/home/alice", "/home/alice"),
+            ("~/", "/home/alice", "/home/alice"),
+            ("~//x", "/home/alice/x", "/home/alice/x"),
+            (
+                "~/.ssh/id_dsa",
+                "/home/alice/.ssh/id_dsa",
+                "/home/alice/.ssh/id_dsa",
+            ),
+            (
+                "config.local",
+                "config.local",
+                "/home/alice/.ssh/config.local",
+            ),
+            ("~bob/config", "~bob/config", "~bob/config"),
+        ];
+        for (input, expected_path, expected_include) in cases {
+            assert_eq!(
+                SshConfigParser::parse_path_arg(input, home).expect("path argument parses"),
+                PathBuf::from(expected_path),
+                "parse_path_arg({input})"
+            );
+            assert_eq!(
+                PathBuf::from(
+                    SshConfigParser::resolve_include_path(input, home)
+                        .expect("include path resolves")
+                ),
+                PathBuf::from(expected_include),
+                "resolve_include_path({input})"
+            );
+        }
     }
 
     #[test]
-    fn test_should_resolve_include_path_with_tilde() {
-        let p = "~/.ssh/config.local";
-        let resolved = SshConfigParser::resolve_include_path(p);
-        let mut expected = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
-        expected.push(".ssh");
-        expected.push("config.local");
-        assert_eq!(PathBuf::from(resolved), expected);
+    fn should_resolve_paths_against_configured_home() -> Result<(), SshParserError> {
+        crate::test_log();
+        let home = tempfile::tempdir()?;
+        let ssh_dir = home.path().join(".ssh");
+        std::fs::create_dir_all(ssh_dir.join("conf.d"))?;
+        std::fs::write(
+            ssh_dir.join("conf.d").join("a.conf"),
+            "Include nested.conf\nHost foo\n    IdentityFile ~/.ssh/foo_key\n",
+        )?;
+        std::fs::write(
+            ssh_dir.join("nested.conf"),
+            "Host bar\n    CertificateFile ~/.ssh/bar-cert.pub\n",
+        )?;
+
+        let mut reader = BufReader::new("Include conf.d/*.conf\n".as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .home_dir(home.path())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(
+            config.query("foo").identity_file,
+            Some(vec![ssh_dir.join("foo_key")])
+        );
+        assert_eq!(
+            config.query("bar").certificate_file,
+            Some(ssh_dir.join("bar-cert.pub"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn should_escape_glob_metacharacters_in_home() -> Result<(), SshParserError> {
+        crate::test_log();
+        let dir = tempfile::tempdir()?;
+        let home = dir.path().join("user[1]");
+        let ssh_dir = home.join(".ssh");
+        std::fs::create_dir_all(&ssh_dir)?;
+        std::fs::write(ssh_dir.join("extra.conf"), "Host foo\n    User bob\n")?;
+
+        for include in ["Include extra.conf\n", "Include ~/.ssh/extra.conf\n"] {
+            let mut reader = BufReader::new(include.as_bytes());
+            let config = SshConfig::default()
+                .default_algorithms(DefaultAlgorithms::empty())
+                .home_dir(&home)
+                .parse(&mut reader, ParseRule::STRICT)?;
+            assert_eq!(
+                config.query("foo").user.as_deref(),
+                Some("bob"),
+                "{include}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn should_reject_include_cycle() -> Result<(), SshParserError> {
+        crate::test_log();
+        // A file is written as `{prefix}Include {includes}`, with each include resolved in the tempdir.
+        type IncludeFile = (&'static str, &'static str, &'static [&'static str]);
+
+        // Each case lists the files to write, the entry file, and the file closing the loop.
+        let cases: [(&[IncludeFile], &str, &str); 2] = [
+            (
+                &[("self.conf", "", &["self.conf"])],
+                "self.conf",
+                "self.conf",
+            ),
+            (
+                &[
+                    ("a.conf", "Host a\n    ", &["b.conf"]),
+                    ("b.conf", "", &["a.conf"]),
+                ],
+                "a.conf",
+                "a.conf",
+            ),
+        ];
+
+        for (files, entry, expected) in cases {
+            let dir = tempfile::tempdir()?;
+            for (name, prefix, includes) in files {
+                let includes = includes
+                    .iter()
+                    .map(|include| dir.path().join(include).display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                std::fs::write(
+                    dir.path().join(name),
+                    format!("{prefix}Include {includes}\n"),
+                )?;
+            }
+
+            let config = format!(
+                "Include {entry}\n",
+                entry = dir.path().join(entry).display()
+            );
+            let mut reader = BufReader::new(config.as_bytes());
+            let err = SshConfig::default()
+                .default_algorithms(DefaultAlgorithms::empty())
+                .parse(&mut reader, ParseRule::STRICT)
+                .unwrap_err();
+
+            let expected = dir.path().join(expected).canonicalize()?;
+            assert_eq!(
+                err.to_string(),
+                format!("include cycle detected: {path}", path = expected.display())
+            );
+            assert!(matches!(err, SshParserError::IncludeCycle(p) if p == expected));
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn should_reject_include_cycle_through_symlink() -> Result<(), SshParserError> {
+        crate::test_log();
+        let dir = tempfile::tempdir()?;
+        let real = dir.path().join("real.conf");
+        let link = dir.path().join("link.conf");
+        std::os::unix::fs::symlink(&real, &link)?;
+        std::fs::write(&real, format!("Include {link}\n", link = link.display()))?;
+
+        let config = format!("Include {real}\n", real = real.display());
+        let mut reader = BufReader::new(config.as_bytes());
+        let err = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)
+            .unwrap_err();
+
+        assert!(matches!(err, SshParserError::IncludeCycle(p) if p == real.canonicalize()?));
+        Ok(())
+    }
+
+    #[test]
+    fn should_allow_non_cyclic_repeated_include() -> Result<(), SshParserError> {
+        crate::test_log();
+        let dir = tempfile::tempdir()?;
+        let shared = dir.path().join("shared.conf");
+        std::fs::write(&shared, "Host shared\n    HostName shared.internal\n")?;
+        let left = dir.path().join("left.conf");
+        let right = dir.path().join("right.conf");
+        std::fs::write(
+            &left,
+            format!("Include {shared}\n", shared = shared.display()),
+        )?;
+        std::fs::write(
+            &right,
+            format!("Include {shared}\n", shared = shared.display()),
+        )?;
+
+        let config = format!(
+            "Include {left} {right}\n",
+            left = left.display(),
+            right = right.display()
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(
+            config.query("shared").host_name.as_deref(),
+            Some("shared.internal")
+        );
+        Ok(())
     }
 
     #[test]
@@ -2241,8 +2472,7 @@ Host *
             Field::AddKeysToAgent,
             vec![String::from("yes")],
             &mut host,
-            ParseRule::STRICT,
-            &DefaultAlgorithms::empty(),
+            None,
         )
         .unwrap();
         assert_eq!(host.params.add_keys_to_agent.unwrap(), true);
@@ -2252,8 +2482,7 @@ Host *
             Field::AddKeysToAgent,
             vec![String::from("no")],
             &mut host2,
-            ParseRule::STRICT,
-            &DefaultAlgorithms::empty(),
+            None,
         )
         .unwrap();
         assert_eq!(host2.params.add_keys_to_agent.unwrap(), false);
@@ -2267,8 +2496,7 @@ Host *
             Field::ForwardAgent,
             vec![String::from("yes")],
             &mut host,
-            ParseRule::STRICT,
-            &DefaultAlgorithms::empty(),
+            None,
         )
         .unwrap();
         assert_eq!(host.params.forward_agent.unwrap(), true);
@@ -2282,8 +2510,7 @@ Host *
             Field::ProxyJump,
             vec![String::from("jump1,jump2,jump3")],
             &mut host,
-            ParseRule::STRICT,
-            &DefaultAlgorithms::empty(),
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -2304,8 +2531,7 @@ Host *
             Field::IdentityFile,
             vec![String::from("/path/to/key1"), String::from("/path/to/key2")],
             &mut host,
-            ParseRule::STRICT,
-            &DefaultAlgorithms::empty(),
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -2615,8 +2841,7 @@ Host test
             Field::UseKeychain,
             vec![String::from("yes")],
             &mut host,
-            ParseRule::STRICT,
-            &DefaultAlgorithms::empty(),
+            None,
         )
         .unwrap();
         assert_eq!(host.params.use_keychain.unwrap(), true);
