@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.9.0
+
+Released on 2026-10-20
+
+### Breaking changes
+
+- **parser:** resolve paths against a configurable home and reject include cycles
+
+> SshParserError has two new variants, HomeNotFound and IncludeCycle. A ~ path or a relative Include with no home directory now fails with HomeNotFound instead of falling back to / or a literal ~, and ~user paths are no longer rewritten.
+
+### Added
+
+- Breaking: **parser:** resolve paths against a configurable home and reject include cycles
+
+> SshConfig gains a home_dir builder. The parser expands ~ and relative Include paths against it, falling back to dirs::home_dir(), and nested includes inherit it. When a home is needed but missing, parsing fails with SshParserError::HomeNotFound instead of falling back to / or a literal ~. ~user prefixes are no longer mangled.
+>
+> Include now tracks the files being included and fails with SshParserError::IncludeCycle instead of overflowing the stack on a self-include or a loop.
+
 ## 0.8.3
 
 Released on 2026-10-20

@@ -25,7 +25,7 @@
 //! First of you need to add **ssh2-config** to your project dependencies:
 //!
 //! ```toml
-//! ssh2-config = "0.8"
+//! ssh2-config = "0.9"
 //! ```
 //!
 //! ## Feature flags
