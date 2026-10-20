@@ -2,14 +2,30 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.8.3
+
+Released on 2026-10-20
+
+### Fixed
+
+- **parser:** include every path argument
+
+> An Include line with several paths only loaded the first one because the arguments were reduced to a single string. Every argument is now resolved and globbed in order, as OpenSSH does: files are read left to right and in glob order, unmatched arguments are skipped, every file stays inside the enclosing Host scope, and the first obtained value wins.
+
+### Build
+
+- **rust-toolchain:** bump rust-toolchain to `1.99.1`
+
 ## 0.8.2
 
 Released on 2026-10-12
 
 ### Fixed
 
-- **parser:** accept true and false as boolean values
+- **parser:** accept true and false as boolean values (#62)
 
+> - fix(parser): accept true and false as boolean values
+>
 > OpenSSH accepts yes/true and no/false, case-insensitively. Previously only lowercase yes and no parsed, so options such as ForwardAgent true failed.
 
 ## 0.8.1
