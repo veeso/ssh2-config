@@ -601,7 +601,7 @@ impl SshConfigParser {
         }
     }
 
-    /// Include a file and return its ordered host rules with inherited scopes.
+    /// Include every file matched by each path argument, in order, and return its ordered host rules with inherited scopes.
     fn include_files(
         args: Vec<String>,
         pattern: &[HostClause],
@@ -610,33 +610,39 @@ impl SshConfigParser {
         default_algos: &DefaultAlgorithms,
         ignore_unknown: Option<Vec<String>>,
     ) -> SshParserResult<Vec<(Host, HostScope)>> {
-        let path_match = Self::resolve_include_path(&Self::parse_string(args)?);
-
-        trace!("include files: {path_match}",);
-        let files = glob(&path_match)?;
+        if args.is_empty() {
+            return Err(SshParserError::MissingArgument);
+        }
 
         let mut new_hosts = vec![];
 
-        for file in files {
-            let file = file?;
-            trace!("including file: {}", file.display());
-            let mut reader = BufReader::new(File::open(file)?);
-            let mut sub_config = SshConfig::default().default_algorithms(default_algos.clone());
-            Self::parse(&mut sub_config, &mut reader, rules, ignore_unknown.clone())?;
+        for arg in args {
+            let path_match = Self::resolve_include_path(&arg);
 
-            let SshConfig {
-                hosts: sub_hosts,
-                host_scopes: sub_scopes,
-                ..
-            } = sub_config;
-            for (index, sub_host) in sub_hosts.into_iter().enumerate() {
-                trace!("adding sub-host: {sub_host:?}",);
-                let mut scope = inherited_scope.to_vec();
-                scope.push(pattern.to_vec());
-                if let Some(sub_scope) = sub_scopes.get(index) {
-                    scope.extend(sub_scope.iter().cloned());
+            trace!("include files: {path_match}",);
+            let files = glob(&path_match)?;
+
+            for file in files {
+                let file = file?;
+                trace!("including file: {}", file.display());
+                let mut reader = BufReader::new(File::open(file)?);
+                let mut sub_config = SshConfig::default().default_algorithms(default_algos.clone());
+                Self::parse(&mut sub_config, &mut reader, rules, ignore_unknown.clone())?;
+
+                let SshConfig {
+                    hosts: sub_hosts,
+                    host_scopes: sub_scopes,
+                    ..
+                } = sub_config;
+                for (index, sub_host) in sub_hosts.into_iter().enumerate() {
+                    trace!("adding sub-host: {sub_host:?}",);
+                    let mut scope = inherited_scope.to_vec();
+                    scope.push(pattern.to_vec());
+                    if let Some(sub_scope) = sub_scopes.get(index) {
+                        scope.extend(sub_scope.iter().cloned());
+                    }
+                    new_hosts.push((sub_host, scope));
                 }
-                new_hosts.push((sub_host, scope));
             }
         }
 
@@ -3012,6 +3018,172 @@ Host *
         );
         assert!(config.query("app1.example.net").user.is_none());
         assert!(config.query("other.example.com").user.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_include_every_path_argument() -> Result<(), SshParserError> {
+        let mut first = NamedTempFile::new().expect("Failed to create first include");
+        first.write_all(b"Host foo\n    HostName foo.internal\n")?;
+        let mut second = NamedTempFile::new().expect("Failed to create second include");
+        second.write_all(b"Host bar\n    HostName bar.internal\n")?;
+
+        let config = format!(
+            "Include {first} {second}\n",
+            first = first.path().display(),
+            second = second.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(
+            config.query("foo").host_name.as_deref(),
+            Some("foo.internal")
+        );
+        assert_eq!(
+            config.query("bar").host_name.as_deref(),
+            Some("bar.internal")
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_take_first_obtained_value_across_include_arguments() -> Result<(), SshParserError> {
+        let mut first = NamedTempFile::new().expect("Failed to create first include");
+        first.write_all(b"Host foo\n    User first\n")?;
+        let mut second = NamedTempFile::new().expect("Failed to create second include");
+        second.write_all(b"Host foo\n    User second\n    Port 2222\n")?;
+
+        let config = format!(
+            "Include {first} {second}\n",
+            first = first.path().display(),
+            second = second.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(config.query("foo").user.as_deref(), Some("first"));
+        assert_eq!(config.query("foo").port, Some(2222));
+
+        let config = format!(
+            "Include {second} {first}\n",
+            first = first.path().display(),
+            second = second.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(config.query("foo").user.as_deref(), Some("second"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_expand_glob_in_each_include_argument() -> Result<(), SshParserError> {
+        let conf_dir = tempfile::tempdir()?;
+        std::fs::write(
+            conf_dir.path().join("10-a.conf"),
+            "Host foo\n    User glob-a\n",
+        )?;
+        std::fs::write(
+            conf_dir.path().join("20-b.conf"),
+            "Host foo\n    User glob-b\n    HostName b.internal\n",
+        )?;
+        std::fs::write(
+            conf_dir.path().join("other.txt"),
+            "Host foo\n    Port 9999\n",
+        )?;
+        let extra_dir = tempfile::tempdir()?;
+        std::fs::write(
+            extra_dir.path().join("x.conf"),
+            "Host bar\n    HostName bar.internal\n",
+        )?;
+
+        let config = format!(
+            "Include {conf}/*.conf {extra}/*.conf\n",
+            conf = conf_dir.path().display(),
+            extra = extra_dir.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(config.query("foo").user.as_deref(), Some("glob-a"));
+        assert_eq!(config.query("foo").host_name.as_deref(), Some("b.internal"));
+        assert!(config.query("foo").port.is_none());
+        assert_eq!(
+            config.query("bar").host_name.as_deref(),
+            Some("bar.internal")
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_skip_unmatched_include_arguments() -> Result<(), SshParserError> {
+        let missing_dir = tempfile::tempdir()?;
+        let missing = missing_dir.path().join("absent").join("*.conf");
+        let mut present = NamedTempFile::new().expect("Failed to create include");
+        present.write_all(b"Host foo\n    HostName foo.internal\n")?;
+
+        let config = format!(
+            "Include {missing} {present} {missing}\n",
+            missing = missing.display(),
+            present = present.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        assert_eq!(
+            config.query("foo").host_name.as_deref(),
+            Some("foo.internal")
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_scope_every_include_argument_to_enclosing_host() -> Result<(), SshParserError> {
+        let mut first = NamedTempFile::new().expect("Failed to create first include");
+        first.write_all(b"Host app*\n    HostName first.internal\n")?;
+        let mut second = NamedTempFile::new().expect("Failed to create second include");
+        second.write_all(b"Port 2222\nHost db*\n    HostName second.internal\n")?;
+
+        let config = format!(
+            "Host *.example.com\n    Include {first} {second}\n    User alice\nHost *\n    User fallback\n",
+            first = first.path().display(),
+            second = second.path().display(),
+        );
+        let mut reader = BufReader::new(config.as_bytes());
+        let config = SshConfig::default()
+            .default_algorithms(DefaultAlgorithms::empty())
+            .parse(&mut reader, ParseRule::STRICT)?;
+
+        let app = config.query("app1.example.com");
+        assert_eq!(app.host_name.as_deref(), Some("first.internal"));
+        assert_eq!(app.port, Some(2222));
+        assert_eq!(app.user.as_deref(), Some("alice"));
+
+        let db = config.query("db1.example.com");
+        assert_eq!(db.host_name.as_deref(), Some("second.internal"));
+        assert_eq!(db.port, Some(2222));
+        assert_eq!(db.user.as_deref(), Some("alice"));
+
+        let outside = config.query("db1.example.net");
+        assert!(outside.host_name.is_none());
+        assert!(outside.port.is_none());
+        assert_eq!(outside.user.as_deref(), Some("fallback"));
 
         Ok(())
     }
