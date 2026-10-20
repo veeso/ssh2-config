@@ -152,10 +152,13 @@ pub use self::parser::{ParseRule, SshParserError, SshParserResult};
 
 /// Describes the ssh configuration.
 /// Configuration is described in this document: <http://man.openbsd.org/OpenBSD-current/man5/ssh_config.5>
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Eq, Default)]
 pub struct SshConfig {
     /// Default algorithms for ssh.
     default_algorithms: DefaultAlgorithms,
+    /// Home directory used to expand `~` and to resolve relative `Include` paths against `<home>/.ssh`.
+    /// `None` means the home directory is taken from [`dirs::home_dir`].
+    home_dir: Option<PathBuf>,
     /// Rulesets for hosts.
     /// Default config will be stored with key `*`
     hosts: Vec<Host>,
@@ -164,6 +167,27 @@ pub struct SshConfig {
 }
 
 pub(crate) type HostScope = Vec<Vec<HostClause>>;
+
+/// Compares parsed configurations, ignoring the home directory used to parse them.
+impl PartialEq for SshConfig {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            default_algorithms,
+            home_dir: _,
+            hosts,
+            host_scopes,
+        } = self;
+        let Self {
+            default_algorithms: other_default_algorithms,
+            home_dir: _,
+            hosts: other_hosts,
+            host_scopes: other_host_scopes,
+        } = other;
+        default_algorithms == other_default_algorithms
+            && hosts == other_hosts
+            && host_scopes == other_host_scopes
+    }
+}
 
 impl fmt::Display for SshConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -184,6 +208,7 @@ impl SshConfig {
     pub fn from_hosts(hosts: Vec<Host>) -> Self {
         Self {
             default_algorithms: DefaultAlgorithms::default(),
+            home_dir: None,
             host_scopes: vec![Vec::new(); hosts.len()],
             hosts,
         }
@@ -248,7 +273,44 @@ impl SshConfig {
         self
     }
 
+    /// Sets the home directory used to resolve `~` and relative `Include` paths.
+    ///
+    /// A leading `~` or `~/` is expanded against this directory, and relative `Include`
+    /// paths are resolved against `<home>/.ssh`. Other `~`-prefixed paths, such as `~user/...`,
+    /// are kept as-is in both `Include` and path options such as `IdentityFile`; an `Include`
+    /// pattern that matches no file is skipped. When it is not set, the home directory is taken
+    /// from [`dirs::home_dir`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io::BufReader;
+    /// use std::path::PathBuf;
+    ///
+    /// use ssh2_config::{ParseRule, SshConfig};
+    ///
+    /// let mut reader = BufReader::new("IdentityFile ~/.ssh/id_ed25519\n".as_bytes());
+    /// let config = SshConfig::default()
+    ///     .home_dir("/home/alice")
+    ///     .parse(&mut reader, ParseRule::STRICT)
+    ///     .expect("Failed to parse configuration");
+    ///
+    /// assert_eq!(
+    ///     config.query("any").identity_file,
+    ///     Some(vec![PathBuf::from("/home/alice/.ssh/id_ed25519")])
+    /// );
+    /// ```
+    pub fn home_dir(mut self, home_dir: impl Into<PathBuf>) -> Self {
+        self.home_dir = Some(home_dir.into());
+
+        self
+    }
+
     /// Parse [`SshConfig`] from stream which implements [`BufRead`] and return parsed configuration or parser error
+    ///
+    /// `~` is expanded against the home set with [`SshConfig::home_dir`], or against
+    /// [`dirs::home_dir`] when none is set, and relative `Include` paths are resolved against
+    /// `<home>/.ssh`.
     ///
     /// ## Example
     ///
@@ -261,10 +323,41 @@ impl SshConfig {
     /// let config = SshConfig::default().parse(&mut reader, ParseRule::STRICT).expect("Failed to parse configuration");
     /// ```
     pub fn parse(mut self, reader: &mut impl BufRead, rules: ParseRule) -> SshParserResult<Self> {
-        parser::SshConfigParser::parse(&mut self, reader, rules, None).map(|_| self)
+        let home = self.home_dir.clone().or_else(dirs::home_dir);
+        parser::SshConfigParser::parse(
+            &mut self,
+            reader,
+            rules,
+            None,
+            &mut parser::IncludeContext::new(home),
+        )
+        .map(|_| self)
     }
 
     /// Parse `~/.ssh/config`` file and return parsed configuration [`SshConfig`] or parser error
+    ///
+    /// The file and every `~` or relative `Include` path in it are resolved against
+    /// [`dirs::home_dir`]. To parse the configuration of another home, open `<home>/.ssh/config`
+    /// and parse it with [`SshConfig::home_dir`] set, as shown below.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::fs::File;
+    /// use std::io::BufReader;
+    /// use std::path::Path;
+    ///
+    /// use ssh2_config::{ParseRule, SshConfig};
+    ///
+    /// let home = Path::new("/home/alice");
+    /// let mut reader = BufReader::new(
+    ///     File::open(home.join(".ssh").join("config")).expect("Could not open configuration file"),
+    /// );
+    /// let config = SshConfig::default()
+    ///     .home_dir(home)
+    ///     .parse(&mut reader, ParseRule::STRICT)
+    ///     .expect("Failed to parse configuration");
+    /// ```
     pub fn parse_default_file(rules: ParseRule) -> SshParserResult<Self> {
         let ssh_folder = dirs::home_dir()
             .ok_or_else(|| {
@@ -342,6 +435,20 @@ mod tests {
         );
 
         SshConfig::default().parse(&mut reader, ParseRule::STRICT)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn should_ignore_home_dir_when_comparing() -> Result<(), parser::SshParserError> {
+        test_log();
+
+        let input = "Host a\n  User x\n";
+        let with_home = SshConfig::default()
+            .home_dir("/home/alice")
+            .parse(&mut input.as_bytes(), ParseRule::STRICT)?;
+        let without_home = SshConfig::default().parse(&mut input.as_bytes(), ParseRule::STRICT)?;
+        assert_eq!(with_home, without_home);
 
         Ok(())
     }
